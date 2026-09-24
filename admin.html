@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin — jrobertoma.com</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --accent:#4f46e5;--accent-soft:#eef2ff;--accent-text:#4338ca;
+  --danger:#dc2626;--success:#16a34a;--warning:#ca8a04;
+  --bg:#fafafa;--bg-elev:#fff;--bg-soft:#f4f4f5;
+  --border:#e4e4e7;--border-strong:#d4d4d8;
+  --text:#18181b;--text-dim:#52525b;--text-faint:#a1a1aa;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04);--shadow-md:0 4px 12px rgba(0,0,0,.06);--shadow-lg:0 12px 32px rgba(0,0,0,.08);
+  --font-ui:'Inter',system-ui,sans-serif;--font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --sidebar-w:232px;--sidebar-w-col:56px;--topbar-h:56px;
+}
+[data-theme=dark]{
+  --accent:#818cf8;--accent-soft:rgba(129,140,248,.12);--accent-text:#a5b4fc;
+  --danger:#f87171;--success:#4ade80;--warning:#facc15;
+  --bg:#0a0a0b;--bg-elev:#131316;--bg-soft:#1a1a1f;
+  --border:#27272a;--border-strong:#3f3f46;
+  --text:#fafafa;--text-dim:#a1a1aa;--text-faint:#71717a;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);--shadow-md:0 4px 12px rgba(0,0,0,.5);--shadow-lg:0 12px 32px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box;}html,body{margin:0;padding:0;}
+body{font-family:var(--font-ui);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;transition:background .18s,color .18s;}
+button,input,textarea,select{font-family:inherit;}
+
+/* Login */
+.login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);}
+.login-card{width:360px;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:36px 32px;box-shadow:var(--shadow-lg);}
+.login-card .logo{font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:-.03em;margin-bottom:4px;}
+.login-card .logo span{color:var(--accent);}
+.login-card .subtitle{color:var(--text-dim);font-size:13px;margin-bottom:28px;}
+.login-card .field{margin-bottom:14px;}
+.login-card .field label{display:block;font-size:12.5px;font-weight:500;margin-bottom:6px;}
+.login-card .field input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:13px;outline:none;}
+.login-card .field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+.login-card .submit{width:100%;padding:10px;background:var(--text);color:var(--bg-elev);border:none;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;transition:opacity .12s;}
+.login-card .submit:hover{opacity:.88;}
+.login-card .submit:disabled{opacity:.5;cursor:not-allowed;}
+.login-card .error{color:var(--danger);font-size:12.5px;margin-top:10px;text-align:center;}
+
+/* Layout */
+.shell{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh;transition:grid-template-columns .22s cubic-bezier(.2,.8,.3,1);}
+.shell.collapsed{grid-template-columns:var(--sidebar-w-col) 1fr;}
+
+/* Sidebar */
+.sidebar{background:var(--bg-elev);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden;}
+.sb-brand{height:var(--topbar-h);display:flex;align-items:center;padding:0 16px;border-bottom:1px solid var(--border);gap:10px;flex-shrink:0;}
+.sb-brand .mark{width:28px;height:28px;border-radius:7px;background:var(--text);color:var(--bg-elev);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;font-size:13px;flex-shrink:0;}
+.sb-brand .name{font-weight:600;font-size:14px;letter-spacing:-.01em;}
+.sb-brand .name .dim{color:var(--text-faint);font-weight:400;}
+.collapsed .sb-brand .name{display:none;}
+.sb-nav{padding:12px 8px;flex:1;overflow-y:auto;}
+.sb-section{margin-bottom:4px;}
+.sb-section .label{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);padding:12px 12px 6px;font-weight:600;}
+.collapsed .sb-section .label{display:none;}
+.sb-item{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:6px;cursor:pointer;color:var(--text-dim);font-weight:500;font-size:13.5px;transition:background .12s,color .12s;margin-bottom:1px;white-space:nowrap;overflow:hidden;}
+.sb-item:hover{background:var(--bg-soft);color:var(--text);}
+.sb-item.active{background:var(--accent-soft);color:var(--accent-text);}
+.sb-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sb-item .badge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:99px;font-family:var(--font-mono);}
+.collapsed .sb-item .lbl,.collapsed .sb-item .badge{display:none;}
+.collapsed .sb-item{justify-content:center;padding:9px;}
+.sb-footer{padding:10px;border-top:1px solid var(--border);flex-shrink:0;}
+.sb-user{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;cursor:pointer;}
+.sb-user:hover{background:var(--bg-soft);}
+.sb-user .avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#818cf8);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;}
+.sb-user .info{overflow:hidden;}
+.sb-user .uname{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sb-user .role{font-size:11px;color:var(--text-faint);}
+.collapsed .sb-user .info{display:none;}
+.sb-actions{display:flex;gap:4px;margin-top:8px;}
+.sb-icon-btn{width:32px;height:32px;border:1px solid var(--border);background:none;border-radius:6px;cursor:pointer;color:var(--text-dim);font-size:14px;display:flex;align-items:center;justify-content:center;transition:background .1s,color .1s;}
+.sb-icon-btn:hover{background:var(--bg-soft);color:var(--text);}
+
+/* Main */
+.main{display:flex;flex-direction:column;min-height:100vh;overflow:hidden;}
+.topbar{height:var(--topbar-h);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;background:var(--bg-elev);flex-shrink:0;}
+.topbar-title{font-weight:600;font-size:15px;}
+.page{padding:28px 32px;flex:1;overflow-y:auto;}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap;}
+.page-title{font-size:22px;font-weight:700;margin:0 0 2px;}
+.page-sub{font-size:13px;color:var(--text-dim);}
+.page-actions{display:flex;gap:8px;flex-shrink:0;}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--border);background:var(--bg-elev);border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text-dim);transition:background .1s,color .1s,border-color .1s;}
+.btn:hover{background:var(--bg-soft);color:var(--text);}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+.btn.primary:hover{opacity:.9;}
+.btn.danger{background:var(--danger);color:#fff;border-color:var(--danger);}
+.btn.danger:hover{opacity:.88;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn.sm{padding:5px 10px;font-size:12px;}
+
+/* Cards & Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:24px;}
+.stat{background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;padding:18px 20px;}
+.stat .label{font-size:12px;color:var(--text-dim);margin-bottom:6px;}
+.stat .value{font-size:28px;font-weight:700;font-family:var(--font-mono);margin-bottom:4px;}
+.stat .delta{font-size:11.5px;color:var(--text-faint);}
+.card{background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;padding:20px;}
+.card-row{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);}
+.card-row:last-child{border-bottom:none;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:900px){.two-col{grid-template-columns:1fr;}}
+
+/* Chart */
+.chart{display:flex;align-items:flex-end;gap:2px;height:120px;margin-top:12px;}
+.bar{flex:1;background:var(--accent-soft);border-radius:3px 3px 0 0;min-height:2px;transition:height .3s;}
+
+/* Table */
+.table{width:100%;border-collapse:collapse;}
+.table th{font-size:11.5px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);}
+.table td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+.table tr:last-child td{border-bottom:none;}
+.table tr:hover td{background:var(--bg-soft);}
+
+/* Toolbar */
+.toolbar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.toolbar input,.toolbar select{padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;outline:none;}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--accent);}
+
+/* Status pills */
+.pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
+.pill.published{background:#dcfce7;color:#15803d;}[data-theme=dark] .pill.published{background:rgba(74,222,128,.15);color:#4ade80;}
+.pill.draft{background:#f4f4f5;color:var(--text-dim);}
+.pill.scheduled{background:#fef9c3;color:#ca8a04;}[data-theme=dark] .pill.scheduled{background:rgba(250,204,21,.12);color:#facc15;}
+.pill.pending{background:#fef9c3;color:#ca8a04;}[data-theme=dark] .pill.pending{background:rgba(250,204,21,.12);color:#facc15;}
+.pill.approved{background:#dcfce7;color:#15803d;}[data-theme=dark] .pill.approved{background:rgba(74,222,128,.15);color:#4ade80;}
+.pill.spam{background:#fee2e2;color:#dc2626;}[data-theme=dark] .pill.spam{background:rgba(248,113,113,.12);color:#f87171;}
+
+/* Form */
+.form-group{margin-bottom:18px;}
+.form-label{display:block;font-size:12.5px;font-weight:500;margin-bottom:7px;}
+.form-input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:13px;outline:none;transition:border-color .15s;}
+.form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+.form-textarea{resize:vertical;min-height:200px;font-family:var(--font-mono);font-size:12px;}
+.form-select{width:100%;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.form-hint{font-size:11.5px;color:var(--text-faint);margin-top:5px;}
+
+/* Media grid */
+.media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;}
+.media-item{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg-soft);cursor:pointer;transition:border-color .15s;}
+.media-item:hover{border-color:var(--accent);}
+.media-thumb{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--bg-soft);font-size:32px;overflow:hidden;}
+.media-thumb img{width:100%;height:100%;object-fit:cover;}
+.media-info{padding:8px 10px;}
+.media-name{font-size:11px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* Drop zone */
+.drop-zone{border:2px dashed var(--border);border-radius:10px;padding:40px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;margin-bottom:20px;}
+.drop-zone:hover,.drop-zone.dragging{border-color:var(--accent);background:var(--accent-soft);}
+.drop-zone .icon{font-size:36px;margin-bottom:8px;}
+.drop-zone p{font-size:13px;color:var(--text-dim);margin:4px 0;}
+
+/* Comments & Messages */
+.thread{display:flex;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border);}
+.thread.unread{background:var(--accent-soft);}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--bg-soft);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;flex-shrink:0;color:var(--text-dim);}
+.body{flex:1;min-width:0;}
+.meta{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
+.meta .name{font-weight:600;font-size:13px;}
+.meta .when{font-size:11.5px;color:var(--text-faint);font-family:var(--font-mono);}
+.meta .on{font-size:11.5px;color:var(--text-faint);}
+.msg-body{font-size:13px;color:var(--text-dim);line-height:1.5;}
+.thread-actions{display:flex;gap:6px;margin-top:10px;}
+
+/* Settings */
+.settings-layout{display:grid;grid-template-columns:180px 1fr;gap:24px;}
+.settings-nav{display:flex;flex-direction:column;gap:2px;}
+.settings-nav-item{padding:7px 12px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text-dim);transition:background .1s,color .1s;}
+.settings-nav-item:hover{background:var(--bg-soft);color:var(--text);}
+.settings-nav-item.active{background:var(--accent-soft);color:var(--accent-text);font-weight:500;}
+.settings-section h3{font-size:15px;font-weight:600;margin:0 0 4px;}
+.settings-section .desc{font-size:12.5px;color:var(--text-dim);margin-bottom:20px;}
+
+/* Markdown preview */
+.md-preview{border:1px solid var(--border);border-radius:7px;padding:12px 16px;min-height:120px;font-size:13px;line-height:1.7;color:var(--text-dim);}
+.md-preview h1,.md-preview h2,.md-preview h3{color:var(--text);}
+.md-preview pre{background:var(--bg-soft);padding:10px;border-radius:5px;overflow-x:auto;font-family:var(--font-mono);font-size:12px;}
+.md-preview code{font-family:var(--font-mono);font-size:12px;background:var(--bg-soft);padding:1px 4px;border-radius:3px;}
+
+/* Tabs */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px;}
+.tab{padding:8px 16px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text-faint);border-bottom:2px solid transparent;transition:color .1s,border-color .1s;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent-text);border-bottom-color:var(--accent);}
+
+@media(max-width:700px){
+  .shell{grid-template-columns:0 1fr;}
+  .sidebar{position:fixed;z-index:200;width:var(--sidebar-w);transform:translateX(-100%);transition:transform .22s;}
+  .sidebar.open{transform:translateX(0);}
+  .page{padding:16px;}
+  .form-row{grid-template-columns:1fr;}
+  .settings-layout{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div id="admin-root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+let _csrfToken = '';
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (_csrfToken && opts.method && opts.method !== 'GET') {
+    headers['X-CSRF-Token'] = _csrfToken;
+  }
+  const res = await fetch('api' + path, { ...opts, headers });
+  return res.json();
+}
+
+// ── Simple markdown renderer ───────────────────────────────────
+function renderMd(text) {
+  if (!text) return '';
+  let h = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/```([\s\S]*?)```/g,'<pre>$1</pre>')
+    .replace(/^- (.+)$/gm,'<li>$1</li>');
+  h = h.replace(/(<li>.*<\/li>)/gs, m => '<ul>'+m+'</ul>');
+  h = h.split(/\n\n+/).map(p => /^<(h\d|ul|pre)/.test(p.trim()) ? p : (p.trim() ? `<p>${p.replace(/\n/g,'<br>')}</p>` : '')).join('');
+  return h;
+}
+
+// ── Login ──────────────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const [user, setUser] = useState('');
+  const [pass, setPass] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault(); setError(''); setLoading(true);
+    try {
+      const res = await api('/auth/login', { method: 'POST', body: JSON.stringify({ username: user, password: pass }) });
+      if (res.ok) { _csrfToken = res.data.csrf_token; onLogin(res.data.username); }
+      else setError(res.error || 'Credenciales incorrectas');
+    } catch { setError('Error de red. Intenta de nuevo.'); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="login-screen">
+      <div className="login-card">
+        <div className="logo">jr<span>·</span>admin</div>
+        <div className="subtitle">Panel de administración · jrobertoma.com</div>
+        <form onSubmit={submit}>
+          <div className="field"><label>Usuario</label><input autoFocus value={user} onChange={e=>setUser(e.target.value)} placeholder="admin" required /></div>
+          <div className="field"><label>Contraseña</label><input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" required /></div>
+          <button type="submit" className="submit" disabled={loading}>{loading ? 'Entrando…' : 'Entrar'}</button>
+          {error && <div className="error">{error}</div>}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard ──────────────────────────────────────────────────
+function Dashboard({ onNewPost }) {
+  const [data, setData] = useState(null);
+  useEffect(() => { api('/analytics?days=30').then(r => { if (r.ok) setData(r.data); }); }, []);
+  const bars = useMemo(() => data?.daily || Array.from({length:30},()=>({views:Math.round(30+Math.random()*70)})), [data]);
+  const maxViews = Math.max(1, ...bars.map(b => b.views));
+
+  return (
+    <>
+      <div className="page-header">
+        <div><h1 className="page-title">Dashboard</h1><div className="page-sub">Últimos 30 días</div></div>
+        <div className="page-actions">
+          <button className="btn" onClick={() => window.open('/','_blank')}>Ver sitio</button>
+          <button className="btn primary" onClick={onNewPost}>+ Nuevo post</button>
+        </div>
+      </div>
+      <div className="stats-grid">
+        <div className="stat"><div className="label">Visitas (30d)</div><div className="value">{data ? Number(data.totals?.total_views||0).toLocaleString() : '—'}</div></div>
+        <div className="stat"><div className="label">Posts</div><div className="value">{data?.totals?.posts ?? '—'}</div></div>
+        <div className="stat"><div className="label">Comentarios</div><div className="value">{data?.totals?.comments ?? '—'}</div></div>
+        <div className="stat"><div className="label">Mensajes</div><div className="value">{data?.totals?.messages ?? '—'}</div></div>
+      </div>
+      <div className="two-col">
+        <div className="card">
+          <h3 style={{margin:'0 0 6px',fontSize:14,fontWeight:600}}>Visitas por día</h3>
+          <div className="chart">{bars.map((b,i) => <div key={i} className="bar" style={{height:`${(b.views/maxViews)*100}%`}} title={`${b.date||i}: ${b.views}`}></div>)}</div>
+        </div>
+        <div className="card" style={{padding:0}}>
+          <h3 style={{margin:0,fontSize:14,fontWeight:600,padding:'20px 20px 12px'}}>Posts más vistos</h3>
+          {(data?.top_posts||[]).slice(0,5).map(p => (
+            <div key={p.id} className="card-row" style={{padding:'10px 20px'}}>
+              <div style={{minWidth:0,flex:1}}><div style={{fontSize:13,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</div><div style={{fontSize:11.5,color:'var(--text-faint)',fontFamily:'var(--font-mono)'}}>{p.date}</div></div>
+              <div style={{fontFamily:'var(--font-mono)',fontSize:12,color:'var(--text-dim)',flexShrink:0,marginLeft:10}}>{Number(p.views).toLocaleString()}</div>
+            </div>
+          ))}
+          {(!data?.top_posts || data.top_posts.length === 0) && <div style={{padding:'20px',color:'var(--text-faint)',fontSize:13}}>Sin datos todavía</div>}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Posts List ─────────────────────────────────────────────────
+function PostsList({ onEdit, onNew }) {
+  const [posts, setPosts] = useState([]);
+  const [filter, setFilter] = useState('all');
+  const [q, setQ] = useState('');
+
+  useEffect(() => {
+    Promise.all([
+      api('/posts?status=all').then(r => { if (r.ok) setPosts(r.data.posts||[]); }),
+    ]);
+  }, []);
+
+  const filtered = posts.filter(p =>
+    (filter === 'all' || p.status === filter) &&
+    (!q || p.title.toLowerCase().includes(q.toLowerCase()))
+  );
+
+  const del = async (id) => {
+    if (!confirm('¿Eliminar este post?')) return;
+    const r = await api(`/posts/${id}`, { method: 'DELETE' });
+    if (r.ok) setPosts(ps => ps.filter(p => p.id !== id));
+  };
+
+  return (
+    <>
+      <div className="page-header">
+        <div><h1 className="page-title">Posts</h1><div className="page-sub">{posts.length} posts en total</div></div>
+        <div className="page-actions"><button className="btn primary" onClick={onNew}>+ Nuevo post</button></div>
+      </div>
+      <div className="card" style={{padding:0}}>
+        <div className="toolbar">
+          <input placeholder="Buscar…" value={q} onChange={e=>setQ(e.target.value)} style={{flex:1,maxWidth:280}} />
+          <select value={filter} onChange={e=>setFilter(e.target.value)}>
+            <option value="all">Todos</option>
+            <option value="published">Publicados</option>
+            <option value="draft">Borradores</option>
+            <option value="scheduled">Programados</option>
+          </select>
+          <span style={{marginLeft:'auto',fontSize:12,color:'var(--text-faint)'}}>{filtered.length} resultados</span>
+        </div>
+        <table className="table">
+          <thead><tr><th>Título</th><th>Categoría</th><th>Estado</th><th>Fecha</th><th>Visitas</th><th>Acciones</th></tr></thead>
+          <tbody>
+            {filtered.map(p => (
+              <tr key={p.id}>
+                <td style={{fontWeight:500,maxWidth:280}}><div style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</div></td>
+                <td style={{fontSize:12,color:'var(--text-dim)'}}>{p.category_label||p.category_id}</td>
+                <td><span className={`pill ${p.status}`}>{p.status}</span></td>
+                <td style={{fontFamily:'var(--font-mono)',fontSize:12}}>{p.date}</td>
+                <td style={{fontFamily:'var(--font-mono)',fontSize:12}}>{Number(p.views||0).toLocaleString()}</td>
+                <td>
+                  <div style={{display:'flex',gap:6}}>
+                    <button className="btn sm" onClick={() => onEdit(p)}>Editar</button>
+                    <button className="btn sm danger" onClick={() => del(p.id)}>Eliminar</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && <tr><td colSpan={6} style={{textAlign:'center',color:'var(--text-faint)',padding:24}}>Sin posts</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+// ── Editor ─────────────────────────────────────────────────────
+function Editor({ initial, onSaved, onBack }) {
+  const [cats, setCats] = useState([]);
+  const [tab, setTab] = useState('edit');
+  const [form, setForm] = useState({
+    id: initial?.id || '',
+    title: initial?.title || '',
+    body: initial?.body || '',
+    excerpt: initial?.excerpt || '',
+    category_id: initial?.category_id || '',
+    status: initial?.status || 'draft',
+    date: initial?.date || new Date().toISOString().slice(0,10),
+    tags: (initial?.tags||[]).join(', '),
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => { api('/categories').then(r => { if (r.ok) setCats(r.data); }); }, []);
+
+  const set = (k, v) => setForm(f => ({...f, [k]: v}));
+
+  const save = async () => {
+    setSaving(true); setError('');
+    const payload = { ...form, tags: form.tags.split(',').map(t=>t.trim()).filter(Boolean) };
+    const r = initial?.id
+      ? await api(`/posts/${initial.id}`, { method: 'PATCH', body: JSON.stringify(payload) })
+      : await api('/posts', { method: 'POST', body: JSON.stringify(payload) });
+    setSaving(false);
+    if (r.ok) onSaved();
+    else setError(r.error || 'Error al guardar');
+  };
+
+  return (
+    <>
+      <div className="page-header">
+        <div><h1 className="page-title">{initial ? 'Editar post' : 'Nuevo post'}</h1></div>
+        <div className="page-actions">
+          <button className="btn" onClick={onBack}>← Volver</button>
+          <button className="btn primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
+        </div>
+      </div>
+      {error && <div style={{color:'var(--danger)',fontSize:12,marginBottom:12}}>{error}</div>}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 280px',gap:20}}>
+        <div>
+          <div className="form-group">
+            <label className="form-label">Título</label>
+            <input className="form-input" value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Título del post" />
+          </div>
+          <div className="tabs">
+            <div className={`tab${tab==='edit'?' active':''}`} onClick={()=>setTab('edit')}>Editar</div>
+            <div className={`tab${tab==='preview'?' active':''}`} onClick={()=>setTab('preview')}>Preview</div>
+          </div>
+          {tab === 'edit'
+            ? <textarea className="form-input form-textarea" style={{height:340}} value={form.body} onChange={e=>set('body',e.target.value)} placeholder="Contenido en Markdown…" />
+            : <div className="md-preview" dangerouslySetInnerHTML={{__html: renderMd(form.body)}} />
+          }
+        </div>
+        <div>
+          <div className="form-group">
+            <label className="form-label">Categoría</label>
+            <select className="form-input form-select" value={form.category_id} onChange={e=>set('category_id',e.target.value)}>
+              <option value="">Seleccionar…</option>
+              {cats.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Estado</label>
+            <select className="form-input form-select" value={form.status} onChange={e=>set('status',e.target.value)}>
+              <option value="draft">Borrador</option>
+              <option value="published">Publicado</option>
+              <option value="scheduled">Programado</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Fecha</label>
+            <input className="form-input" type="date" value={form.date} onChange={e=>set('date',e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Slug / ID</label>
+            <input className="form-input" value={form.id} onChange={e=>set('id',e.target.value)} placeholder="mi-post-url" />
+            <div className="form-hint">Dejar vacío para auto-generar</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Tags</label>
+            <input className="form-input" value={form.tags} onChange={e=>set('tags',e.target.value)} placeholder="linux, kernel, rust" />
+            <div className="form-hint">Separados por comas</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Extracto</label>
+            <textarea className="form-input" style={{minHeight:80,resize:'vertical'}} value={form.excerpt} onChange={e=>set('excerpt',e.target.value)} placeholder="Breve descripción del post…" />
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Categories & Tags ──────────────────────────────────────────
+function TagsManager() {
+  const [cats, setCats] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [newTag, setNewTag] = useState('');
+  const [newCat, setNewCat] = useState({ id:'', label:'', color:'#39ff14' });
+
+  useEffect(() => {
+    api('/categories').then(r => { if (r.ok) setCats(r.data); });
+    api('/tags').then(r => { if (r.ok) setTags(r.data); });
+  }, []);
+
+  const addTag = async () => {
+    if (!newTag.trim()) return;
+    const r = await api('/tags', { method: 'POST', body: JSON.stringify({ name: newTag.trim() }) });
+    if (r.ok) { api('/tags').then(r2 => { if (r2.ok) setTags(r2.data); }); setNewTag(''); }
+  };
+
+  const delTag = async (name) => {
+    const r = await api(`/tags/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    if (r.ok) setTags(ts => ts.filter(t => t.name !== name));
+  };
+
+  const addCat = async () => {
+    if (!newCat.id || !newCat.label) return;
+    const r = await api('/categories', { method: 'POST', body: JSON.stringify(newCat) });
+    if (r.ok) { api('/categories').then(r2 => { if (r2.ok) setCats(r2.data); }); setNewCat({id:'',label:'',color:'#39ff14'}); }
+  };
+
+  return (
+    <>
+      <h1 className="page-title" style={{marginBottom:24}}>Categorías y Tags</h1>
+      <div className="two-col">
+        <div>
+          <div className="card">
+            <h3 style={{margin:'0 0 16px',fontSize:14,fontWeight:600}}>Categorías ({cats.length})</h3>
+            <table className="table">
+              <thead><tr><th>ID</th><th>Nombre</th><th>Posts</th><th></th></tr></thead>
+              <tbody>
+                {cats.map(c => (
+                  <tr key={c.id}>
+                    <td style={{fontFamily:'var(--font-mono)',fontSize:11}}>{c.id}</td>
+                    <td><span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:8,height:8,borderRadius:'50%',background:c.color,display:'inline-block'}}></span>{c.label}</span></td>
+                    <td style={{fontFamily:'var(--font-mono)',fontSize:12}}>{c.post_count||0}</td>
+                    <td></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{marginTop:16,display:'flex',gap:8,flexWrap:'wrap'}}>
+              <input className="form-input" style={{flex:1,minWidth:80}} placeholder="id-cat" value={newCat.id} onChange={e=>setNewCat(n=>({...n,id:e.target.value}))} />
+              <input className="form-input" style={{flex:2,minWidth:100}} placeholder="Nombre" value={newCat.label} onChange={e=>setNewCat(n=>({...n,label:e.target.value}))} />
+              <input type="color" value={newCat.color} onChange={e=>setNewCat(n=>({...n,color:e.target.value}))} style={{width:36,height:36,padding:2,border:'1px solid var(--border)',borderRadius:6,cursor:'pointer'}} />
+              <button className="btn primary" onClick={addCat}>Añadir</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div className="card">
+            <h3 style={{margin:'0 0 16px',fontSize:14,fontWeight:600}}>Tags ({tags.length})</h3>
+            <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}>
+              {tags.map(t => (
+                <span key={t.name} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 10px',border:'1px solid var(--border)',borderRadius:99,fontSize:12}}>
+                  #{t.name} <span style={{fontSize:10,color:'var(--text-faint)'}}>{t.post_count}</span>
+                  <button onClick={()=>delTag(t.name)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-faint)',fontSize:14,lineHeight:1,padding:'0 0 0 4px'}}>×</button>
+                </span>
+              ))}
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <input className="form-input" style={{flex:1}} placeholder="nuevo-tag" value={newTag} onChange={e=>setNewTag(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addTag()} />
+              <button className="btn primary" onClick={addTag}>Añadir</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Media ──────────────────────────────────────────────────────
+function Media() {
+  const [files, setFiles] = useState([]);
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => { api('/media').then(r => { if (r.ok) setFiles(r.data||[]); }); }, []);
+
+  const upload = async (file) => {
+    setUploading(true);
+    const fd = new FormData(); fd.append('file', file);
+    try {
+      const res = await fetch('api/media', { method: 'POST', headers: { 'X-CSRF-Token': _csrfToken }, body: fd }).then(r=>r.json());
+      if (res.ok) { const r2 = await api('/media'); if (r2.ok) setFiles(r2.data||[]); }
+    } finally { setUploading(false); }
+  };
+
+  const del = async (id) => {
+    const r = await api(`/media/${id}`, { method: 'DELETE' });
+    if (r.ok) setFiles(fs => fs.filter(f => f.id !== id));
+  };
+
+  return (
+    <>
+      <div className="page-header">
+        <div><h1 className="page-title">Multimedia</h1><div className="page-sub">{files.length} archivos</div></div>
+      </div>
+      <div
+        className={`drop-zone${dragging ? ' dragging' : ''}`}
+        onClick={() => inputRef.current?.click()}
+        onDragOver={e=>{e.preventDefault();setDragging(true);}}
+        onDragLeave={()=>setDragging(false)}
+        onDrop={e=>{e.preventDefault();setDragging(false);const f=e.dataTransfer.files[0];if(f)upload(f);}}
+      >
+        <div className="icon">📎</div>
+        <p>{uploading ? 'Subiendo…' : 'Arrastra una imagen o haz click para seleccionar'}</p>
+        <p style={{fontSize:12}}>JPEG, PNG, GIF, WebP · máx 10 MB</p>
+        <input ref={inputRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files[0])upload(e.target.files[0]);}} />
+      </div>
+      <div className="media-grid">
+        {files.map(f => (
+          <div key={f.id} className="media-item">
+            <div className="media-thumb">
+              <img src={f.url} alt={f.original_name} onError={e=>e.target.style.display='none'} />
+            </div>
+            <div className="media-info">
+              <div className="media-name">{f.original_name}</div>
+              <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}>
+                <span style={{fontSize:10,color:'var(--text-faint)'}}>{f.mime_type?.split('/')[1]?.toUpperCase()}</span>
+                <button onClick={()=>del(f.id)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:12}}>×</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ── Comments ───────────────────────────────────────────────────
+function Comments() {
+  const [comments, setComments] = useState([]);
+  const [filter, setFilter] = useState('pending');
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    api(`/comments?filter=${filter}`).then(r => { if (r.ok) setComments(r.data||[]); }).finally(()=>setLoading(false));
+  }, [filter]);
+
+  useEffect(load, [load]);
+
+  const action = async (id, status) => {
+    const r = await api(`/comments/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    if (r.ok) setComments(cs => cs.map(c => c.id === id ? { ...c, status } : c));
+  };
+
+  const del = async (id) => {
+    const r = await api(`/comments/${id}`, { method: 'DELETE' });
+    if (r.ok) setComments(cs => cs.filter(c => c.id !== id));
+  };
+
+  return (
+    <>
+      <div className="page-header">
+        <div><h1 className="page-title">Comentarios</h1></div>
+      </div>
+      <div className="card" style={{padding:0}}>
+        <div className="toolbar">
+          <select value={filter} onChange={e=>setFilter(e.target.value)}>
+            <option value="all">Todos</option>
+            <option value="pending">Pendientes</option>
+            <option value="spam">Spam</option>
+          </select>
+        </div>
+        {loading ? <div style={{padding:24,color:'var(--text-dim)',fontSize:13}}>Cargando…</div> :
+          comments.length === 0 ? <div style={{padding:24,color:'var(--text-dim)',fontSize:13}}>No hay comentarios en esta vista.</div> :
+          comments.map(c => (
+            <div key={c.id} className={`thread${c.status==='pending'?' unread':''}`}>
+              <div className="avatar">{(c.author_name||'?')[0].toUpperCase()}</div>
+              <div className="body">
+                <div className="meta">
+                  <span className="name">{c.author_name}</span>
+                  <span className="when">{c.created_at?.slice(0,10)}</span>
+                  <span className="on">en {c.post_id}</span>
+                  <span className={`pill ${c.status}`}>{c.status}</span>
+                </div>
+                <div className="msg-body">{c.body}</div>
+                <div className="thread-actions">
+                  {c.status !== 'approved' && <button className="btn sm" onClick={()=>action(c.id,'approved')}>Aprobar</button>}
+                  {c.status !== 'spam'     && <button className="btn sm" onClick={()=>action(c.id,'spam')}>Spam</button>}
+                  <button className="btn sm danger" onClick={()=>del(c.id)}>Eliminar</button>
+                </div>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </>
+  );
+}
+
+// ── Messages ───────────────────────────────────────────────────
+function Messages() {
+  const [msgs, setMsgs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api('/messages').then(r => { if (r.ok) setMsgs(r.data||[]); }).finally(()=>setLoading(false));
+  }, []);
+
+  const archive = async (id) => {
+    const r = await api(`/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ is_archived: 1, is_read: 1 }) });
+    if (r.ok) setMsgs(ms => ms.filter(m => m.id !== id));
+  };
+
+  const del = async (id) => {
+    if (!confirm('¿Eliminar este mensaje?')) return;
+    const r = await api(`/messages/${id}`, { method: 'DELETE' });
+    if (r.ok) setMsgs(ms => ms.filter(m => m.id !== id));
+  };
+
+  const markRead = (id) => api(`/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ is_read: 1 }) });
+
+  return (
+    <>
+      <div className="page-header">
+        <div><h1 className="page-title">Mensajes</h1><div className="page-sub">{msgs.filter(m=>!m.is_read).length} sin leer</div></div>
+      </div>
+      <div className="card" style={{padding:0}}>
+        {loading ? <div style={{padding:24,color:'var(--text-dim)',fontSize:13}}>Cargando…</div> :
+          msgs.length === 0 ? <div style={{padding:24,color:'var(--text-dim)',fontSize:13}}>No hay mensajes.</div> :
+          msgs.map(m => (
+            <div key={m.id} className={`thread${!m.is_read?' unread':''}`} onClick={()=>markRead(m.id)}>
+              <div className="avatar">{(m.sender_name||'?')[0].toUpperCase()}</div>
+              <div className="body">
+                <div className="meta">
+                  <span className="name">{m.sender_name}</span>
+                  <span className="when">{m.created_at?.slice(0,10)}</span>
+                  <span className="on">{m.sender_email}</span>
+                  {!m.is_read && <span className="pill pending">nuevo</span>}
+                </div>
+                {m.subject && <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>{m.subject}</div>}
+                <div className="msg-body">{m.body}</div>
+                <div className="thread-actions">
+                  <button className="btn sm" onClick={()=>archive(m.id)}>Archivar</button>
+                  <button className="btn sm danger" onClick={()=>del(m.id)}>Eliminar</button>
+                </div>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </>
+  );
+}
+
+// ── Analytics ──────────────────────────────────────────────────
+function Analytics() {
+  const [data, setData] = useState(null);
+  const [days, setDays] = useState(30);
+
+  useEffect(() => {
+    api(`/analytics?days=${days}`).then(r => { if (r.ok) setData(r.data); });
+  }, [days]);
+
+  const bars = data?.daily || [];
+  const maxV = Math.max(1, ...bars.map(b => b.views));
+
+  return (
+    <>
+      <div className="page-header">
+        <div><h1 className="page-title">Analytics</h1></div>
+        <div className="page-actions">
+          {[7,30,60,90].map(d => <button key={d} className={`btn${days===d?' primary':''}`} onClick={()=>setDays(d)}>{d}d</button>)}
+        </div>
+      </div>
+      <div className="stats-grid">
+        <div className="stat"><div className="label">Visitas ({days}d)</div><div className="value">{data ? Number(data.totals?.total_views||0).toLocaleString() : '—'}</div></div>
+        <div className="stat"><div className="label">Posts publicados</div><div className="value">{data?.totals?.posts ?? '—'}</div></div>
+        <div className="stat"><div className="label">Comentarios</div><div className="value">{data?.totals?.comments ?? '—'}</div></div>
+        <div className="stat"><div className="label">Mensajes</div><div className="value">{data?.totals?.messages ?? '—'}</div></div>
+      </div>
+      <div className="card" style={{marginBottom:20}}>
+        <h3 style={{margin:'0 0 12px',fontSize:14,fontWeight:600}}>Visitas por día</h3>
+        <div className="chart">{bars.map((b,i) => <div key={i} className="bar" style={{height:`${(b.views/maxV)*100}%`}} title={`${b.date}: ${b.views}`}></div>)}</div>
+      </div>
+      <div className="card" style={{padding:0}}>
+        <h3 style={{margin:0,fontSize:14,fontWeight:600,padding:'20px 20px 12px'}}>Posts más vistos</h3>
+        {(data?.top_posts||[]).map(p => (
+          <div key={p.id} className="card-row" style={{padding:'10px 20px'}}>
+            <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</div></div>
+            <div style={{fontFamily:'var(--font-mono)',fontSize:12,color:'var(--text-dim)',flexShrink:0}}>{Number(p.views).toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ── Settings ───────────────────────────────────────────────────
+function Settings() {
+  const [active, setActive] = useState('profile');
+  const [vals, setVals] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const GROUPS = [
+    { id:'profile',  label:'Perfil' },
+    { id:'site',     label:'Sitio' },
+    { id:'social',   label:'Social' },
+    { id:'comments', label:'Comentarios' },
+    { id:'advanced', label:'Avanzado' },
+  ];
+
+  const FIELDS = {
+    profile:  [['profile_name','Nombre'],['profile_email','Email'],['profile_bio','Bio']],
+    site:     [['site_title','Título'],['site_description','Descripción'],['site_domain','Dominio'],['site_posts_per_page','Posts por página']],
+    social:   [['social_github','GitHub'],['social_mastodon','Mastodon'],['social_rss','RSS'],['social_email','Email público']],
+    comments: [['comments_enabled','Comentarios habilitados'],['rss_enabled','RSS habilitado']],
+    advanced: [['analytics_enabled','Analytics habilitado'],['webhook_url','Webhook URL']],
+  };
+
+  useEffect(() => {
+    api('/settings').then(r => { if (r.ok) setVals(r.data); });
+  }, []);
+
+  const save = async () => {
+    setSaving(true); setSaved(false);
+    const payload = {};
+    (FIELDS[active]||[]).forEach(([k]) => { if (k in vals) payload[k] = vals[k]; });
+    await api(`/settings/${active}`, { method: 'PATCH', body: JSON.stringify(payload) });
+    setSaving(false); setSaved(true);
+    setTimeout(()=>setSaved(false), 2000);
+  };
+
+  return (
+    <>
+      <div className="page-header">
+        <div><h1 className="page-title">Configuración</h1></div>
+        <div className="page-actions">
+          <button className="btn primary" onClick={save} disabled={saving}>{saving?'Guardando…':saved?'✓ Guardado':'Guardar'}</button>
+        </div>
+      </div>
+      <div className="settings-layout">
+        <div className="settings-nav">
+          {GROUPS.map(g => <div key={g.id} className={`settings-nav-item${active===g.id?' active':''}`} onClick={()=>setActive(g.id)}>{g.label}</div>)}
+        </div>
+        <div className="settings-section card">
+          {(FIELDS[active]||[]).map(([key, label]) => (
+            <div key={key} className="form-group">
+              <label className="form-label">{label}</label>
+              <input className="form-input" value={vals[key]||''} onChange={e=>setVals(v=>({...v,[key]:e.target.value}))} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Shell ──────────────────────────────────────────────────────
+const NAV = [
+  { id:'dashboard', label:'Dashboard', ico:'📊', section:'contenido' },
+  { id:'posts',     label:'Posts',     ico:'📝', section:'contenido' },
+  { id:'tags',      label:'Categorías/Tags', ico:'🏷️', section:'contenido' },
+  { id:'media',     label:'Multimedia', ico:'🖼️', section:'contenido' },
+  { id:'comments',  label:'Comentarios', ico:'💬', section:'interaccion' },
+  { id:'messages',  label:'Mensajes',  ico:'✉️', section:'interaccion' },
+  { id:'analytics', label:'Analytics', ico:'📈', section:'sistema' },
+  { id:'settings',  label:'Configuración', ico:'⚙️', section:'sistema' },
+];
+
+function AdminShell({ username, onLogout }) {
+  const [view,      setView]  = useState('dashboard');
+  const [collapsed, setCol]   = useState(false);
+  const [editPost,  setEdit]  = useState(null);
+  const [newPost,   setNew]   = useState(false);
+
+  const theme = () => {
+    const html = document.documentElement;
+    html.setAttribute('data-theme', html.getAttribute('data-theme')==='dark' ? 'light' : 'dark');
+    localStorage.setItem('admin-theme', html.getAttribute('data-theme'));
+  };
+
+  useEffect(() => {
+    const t = localStorage.getItem('admin-theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+  }, []);
+
+  const logout = async () => {
+    await api('/auth/logout', { method: 'POST' });
+    onLogout();
+  };
+
+  const goNew  = () => { setEdit(null); setNew(true); setView('editor'); };
+  const goEdit = (p) => { setEdit(p); setNew(false); setView('editor'); };
+  const saved  = () => { setView('posts'); setEdit(null); setNew(false); };
+
+  const sections = [...new Set(NAV.map(n=>n.section))];
+
+  let content;
+  if (view === 'editor')   content = <Editor initial={editPost} onSaved={saved} onBack={()=>setView('posts')} />;
+  else if (view === 'dashboard') content = <Dashboard onNewPost={goNew} />;
+  else if (view === 'posts')     content = <PostsList onEdit={goEdit} onNew={goNew} />;
+  else if (view === 'tags')      content = <TagsManager />;
+  else if (view === 'media')     content = <Media />;
+  else if (view === 'comments')  content = <Comments />;
+  else if (view === 'messages')  content = <Messages />;
+  else if (view === 'analytics') content = <Analytics />;
+  else if (view === 'settings')  content = <Settings />;
+
+  return (
+    <div className={`shell${collapsed?' collapsed':''}`}>
+      <div className="sidebar">
+        <div className="sb-brand">
+          <div className="mark">J</div>
+          <div className="name">jr<span className="dim">·</span>admin</div>
+        </div>
+        <div className="sb-nav">
+          {sections.map(sec => (
+            <div key={sec} className="sb-section">
+              <div className="label">{sec}</div>
+              {NAV.filter(n=>n.section===sec).map(n => (
+                <div key={n.id} className={`sb-item${view===n.id||view==='editor'&&n.id==='posts'?' active':''}`} onClick={()=>setView(n.id)}>
+                  <span className="ico">{n.ico}</span>
+                  <span className="lbl">{n.label}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="sb-footer">
+          <div className="sb-user">
+            <div className="avatar">{(username||'A')[0].toUpperCase()}</div>
+            <div className="info"><div className="uname">{username}</div><div className="role">Administrador</div></div>
+          </div>
+          <div className="sb-actions">
+            <button className="sb-icon-btn" onClick={()=>setCol(c=>!c)} title="Colapsar">☰</button>
+            <button className="sb-icon-btn" onClick={theme} title="Tema">◑</button>
+            <button className="sb-icon-btn" onClick={logout} title="Salir">⏻</button>
+          </div>
+        </div>
+      </div>
+      <div className="main">
+        <div className="page">{content}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Root ───────────────────────────────────────────────────────
+function App() {
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    api('/auth/me').then(r => {
+      if (r.ok) { _csrfToken = r.data.csrf_token; setUser(r.data.username); }
+    }).finally(() => setChecking(false));
+  }, []);
+
+  if (checking) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'var(--text-faint)',fontSize:13}}>Cargando…</div>;
+  if (!user)    return <LoginScreen onLogin={u => setUser(u)} />;
+  return <AdminShell username={user} onLogout={() => setUser(null)} />;
+}
+
+ReactDOM.createRoot(document.getElementById('admin-root')).render(<App />);
+</script>
+</body>
+</html>

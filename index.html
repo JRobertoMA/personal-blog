@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>jrobertoma.com</title>
+<link rel="stylesheet" href="assets/styles.css" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #000; }
+  #root { width: 100vw; height: 100vh; }
+  #app-loading {
+    position: fixed; inset: 0; background: #000;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; color: #39ff14;
+    z-index: 99999;
+    transition: opacity 0.4s;
+  }
+  #app-loading.hidden { opacity: 0; pointer-events: none; }
+  #app-loading .logo { font-size: 48px; font-weight: 700; letter-spacing: -0.04em; margin-bottom: 8px; text-shadow: 0 0 20px #39ff14; }
+  #app-loading .sub { font-size: 11px; color: #a0a6b0; letter-spacing: 0.3em; text-transform: uppercase; margin-bottom: 40px; }
+  #app-loading .msg { font-size: 11px; color: #6b7280; }
+</style>
+</head>
+<body>
+
+<div id="app-loading">
+  <div class="logo">jr<span style="color:#00f0ff">·</span>os</div>
+  <div class="sub">jrobertoma.com</div>
+  <div class="msg">cargando datos…</div>
+</div>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script>
+  window.BLOG_POSTS = [];
+  window.BLOG_CATEGORIES = [];
+
+  window.__dataReady = fetch('api/posts')
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (res.ok && res.data) {
+        window.BLOG_POSTS      = res.data.posts      || [];
+        window.BLOG_CATEGORIES = res.data.categories || [];
+      }
+    })
+    .catch(function() {
+      console.warn('jrobertoma: could not reach api/posts');
+    });
+</script>
+
+<script type="text/babel" src="assets/tweaks-panel.jsx"></script>
+<script type="text/babel" src="assets/window-manager.jsx"></script>
+<script type="text/babel" src="assets/apps.jsx"></script>
+<script type="text/babel" src="assets/desktop.jsx"></script>
+<script type="text/babel" src="assets/pixel.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect } = React;
+
+const TWEAK_DEFAULTS = {
+  "wallpaper": "neon",
+  "soundsOn": true,
+  "showBoot": true,
+  "accent": "neon-green"
+};
+
+function useResponsive() {
+  const [mobile, setMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return mobile;
+}
+
+function Root() {
+  const [tweaks, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
+  const [ready, setReady] = useState(false);
+  const isMobile = useResponsive();
+
+  useEffect(() => {
+    window.__dataReady.then(() => {
+      setReady(true);
+      const el = document.getElementById('app-loading');
+      if (el) el.classList.add('hidden');
+      setTimeout(() => { if (el) el.remove(); }, 500);
+    });
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const map = {
+      'neon-green': ['#39ff14', '#00f0ff'],
+      'cyan':       ['#00f0ff', '#39ff14'],
+      'magenta':    ['#ff00d4', '#00f0ff'],
+      'amber':      ['#ffb800', '#ff00d4'],
+    };
+    const [neon, neon2] = map[tweaks.accent] || map.amber;
+    root.style.setProperty('--neon', neon);
+    root.style.setProperty('--neon-2', neon2);
+  }, [tweaks.accent]);
+
+  if (!ready) return null;
+
+  return isMobile
+    ? <window.Pixel tweaks={tweaks} setTweak={setTweak} />
+    : <window.Desktop tweaks={tweaks} setTweak={setTweak} />;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+</body>
+</html>

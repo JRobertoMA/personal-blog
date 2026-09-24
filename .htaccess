@@ -1,0 +1,17 @@
+Options -Indexes
+RewriteEngine On
+
+# Protect .env and config files
+<FilesMatch "^\.env|config\.ini">
+  Require all denied
+</FilesMatch>
+
+# API routes → PHP router
+RewriteRule ^api/(.*)$ api/index.php [L,QSA]
+
+# Static files served directly
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# SPA fallback → index.html
+RewriteRule ^ index.html [L]

@@ -1,0 +1,4 @@
+# Only index.php is accessible directly; all other PHP files are handlers
+<FilesMatch "^(?!index\.php$).*\.php$">
+  Require all denied
+</FilesMatch>
