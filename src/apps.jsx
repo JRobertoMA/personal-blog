@@ -2,24 +2,40 @@
 (function() {
 const { useState: useS, useEffect, useRef, useMemo } = React;
 
-// ── Simple markdown → HTML (no deps) ──────────────────────────
-function md(text) {
-  if (!text) return '';
-  let h = text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm,  '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm,   '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/```([\s\S]*?)```/g, '<pre>$1</pre>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>');
-  h = h.replace(/(<li>.*<\/li>)/gs, m => '<ul>' + m + '</ul>');
-  h = h.split(/\n\n+/).map(p =>
-    /^<(h\d|ul|pre|blockquote)/.test(p.trim()) ? p :
-    (p.trim() ? `<p>${p.replace(/\n/g,'<br>')} </p>` : '')
-  ).join('');
-  return h;
+const md = (text) => window.renderMarkdown(text);
+
+// ── Carga del post completo ────────────────────────────────────
+// GET /api/posts no incluye el cuerpo; se pide bajo demanda y se cachea.
+const postCache = {};
+function usePost(id) {
+  const summary = (window.BLOG_POSTS || []).find(p => p.id === id) || null;
+  const [state, setState] = useS(() => ({ post: postCache[id] || null, loading: !postCache[id], error: null }));
+
+  useEffect(() => {
+    if (!id) return;
+    if (postCache[id]) { setState({ post: postCache[id], loading: false, error: null }); return; }
+    let alive = true;
+    setState({ post: null, loading: true, error: null });
+    fetch(`api/posts/${encodeURIComponent(id)}`)
+      .then(r => r.json())
+      .then(res => {
+        if (!alive) return;
+        if (res.ok) { postCache[id] = res.data; setState({ post: res.data, loading: false, error: null }); }
+        else setState({ post: null, loading: false, error: res.error || 'Post no encontrado' });
+      })
+      .catch(() => alive && setState({ post: null, loading: false, error: 'No se pudo cargar el post' }));
+    return () => { alive = false; };
+  }, [id]);
+
+  return { ...state, post: state.post ? { ...summary, ...state.post } : summary };
+}
+
+// Cuenta una visita por post y por sesión del navegador
+function trackView(id) {
+  if (!id) return;
+  const key = 'jr-viewed-' + id;
+  try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) {}
+  fetch(`api/posts/${encodeURIComponent(id)}/view`, { method: 'POST' }).catch(() => {});
 }
 
 const CAT_COLORS = {
@@ -35,12 +51,9 @@ const CAT_COLORS = {
 function ReaderApp({ onOpenComments }) {
   const posts = window.BLOG_POSTS || [];
   const [currentId, setCurrentId] = useS(posts[0]?.id || null);
-  const post = posts.find(p => p.id === currentId);
+  const { post, loading } = usePost(currentId);
 
-  useEffect(() => {
-    if (!currentId) return;
-    fetch(`api/posts/${currentId}/view`, { method: 'POST' }).catch(() => {});
-  }, [currentId]);
+  useEffect(() => { trackView(currentId); }, [currentId]);
 
   return (
     <div className="reader-layout">
@@ -63,7 +76,9 @@ function ReaderApp({ onOpenComments }) {
             <div className="meta">
               {post.date} · {(post.tags || []).map(t => <span key={t} className="tag-pill">#{t}</span>)}
             </div>
-            <div className="post-body" dangerouslySetInnerHTML={{ __html: md(post.body) }} />
+            {loading && !post.body
+              ? <div style={{ color: 'var(--text-faint)', fontSize: 13 }}>cargando…</div>
+              : <div className="post-body" dangerouslySetInnerHTML={{ __html: md(post.body) }} />}
             <h2>// fin</h2>
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-faint)' }}>
               ─── Gracias por leer. — JR
@@ -93,7 +108,7 @@ function CommentsApp({ postId }) {
   const [status, setStatus] = useS('idle');
   const tsRef = useRef(Date.now());
 
-  const pid = postId || (window.BLOG_POSTS[0]?.id);
+  const pid = postId || ((window.BLOG_POSTS || [])[0]?.id);
 
   useEffect(() => {
     if (!pid) return;
@@ -145,7 +160,7 @@ function CommentsApp({ postId }) {
               <span className="comment-author">{c.author_name}</span>
               <span className="comment-date">{c.created_at?.slice(0, 10)}</span>
             </div>
-            <div className="comment-body">{c.body}</div>
+            <div className="comment-body" style={{ whiteSpace: 'pre-wrap' }}>{c.body}</div>
           </div>
         ))}
         {status === 'sent' ? (
@@ -154,9 +169,9 @@ function CommentsApp({ postId }) {
           </div>
         ) : (
           <form className="comment-form" onSubmit={submit}>
-            <input value={name}  onChange={e => setName(e.target.value)}  placeholder="Tu nombre" required />
-            <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email (opcional)" type="email" />
-            <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Tu comentario…" required />
+            <input value={name}  onChange={e => setName(e.target.value)}  placeholder="Tu nombre" aria-label="Tu nombre" autoComplete="name" maxLength={120} required />
+            <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email (opcional, no se publica)" aria-label="Email (opcional)" type="email" autoComplete="email" maxLength={200} />
+            <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Tu comentario…" aria-label="Tu comentario" maxLength={5000} required />
             {typeof status === 'string' && status !== 'idle' && status !== 'sending' && status !== 'sent' && (
               <div style={{ color: 'var(--neon-2)', fontSize: 11 }}>{status}</div>
             )}
@@ -234,13 +249,12 @@ function FilesApp({ onOpenPost }) {
 
 // ── Post App (ventana individual de post) ──────────────────────
 function PostApp({ postId, onOpenComments }) {
-  const post = (window.BLOG_POSTS || []).find(p => p.id === postId);
+  const { post, loading, error } = usePost(postId);
 
-  useEffect(() => {
-    if (postId) fetch(`api/posts/${postId}/view`, { method: 'POST' }).catch(() => {});
-  }, [postId]);
+  useEffect(() => { trackView(postId); }, [postId]);
 
-  if (!post) return <div style={{ padding: 24, color: 'var(--text-faint)', fontSize: 13 }}>Post no encontrado.</div>;
+  if (!post && loading) return <div style={{ padding: 24, color: 'var(--text-faint)', fontSize: 13 }}>cargando…</div>;
+  if (!post || error) return <div style={{ padding: 24, color: 'var(--text-faint)', fontSize: 13 }}>Post no encontrado.</div>;
 
   return (
     <div className="app">
@@ -248,7 +262,9 @@ function PostApp({ postId, onOpenComments }) {
       <div className="meta">
         {post.date} · {(post.tags || []).map(t => <span key={t} className="tag-pill">#{t}</span>)}
       </div>
-      <div className="post-body" dangerouslySetInnerHTML={{ __html: md(post.body) }} />
+      {loading && !post.body
+        ? <div style={{ color: 'var(--text-faint)', fontSize: 13 }}>cargando…</div>
+        : <div className="post-body" dangerouslySetInnerHTML={{ __html: md(post.body) }} />}
       <h2>// fin</h2>
       <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-faint)' }}>─── Gracias por leer. — JR</p>
       <div style={{ marginTop: 8 }}>
@@ -512,18 +528,18 @@ function MailApp() {
       <form className="mail-form" onSubmit={submit}>
         <div className="row">
           <div>
-            <label>Nombre</label>
-            <input value={form.sender_name} onChange={e => set('sender_name', e.target.value)} required placeholder="Tu nombre" />
+            <label htmlFor="mail-name">Nombre</label>
+            <input id="mail-name" value={form.sender_name} onChange={e => set('sender_name', e.target.value)} required placeholder="Tu nombre" autoComplete="name" maxLength={120} />
           </div>
           <div>
-            <label>Email</label>
-            <input value={form.sender_email} onChange={e => set('sender_email', e.target.value)} required type="email" placeholder="tu@email.com" />
+            <label htmlFor="mail-email">Email</label>
+            <input id="mail-email" value={form.sender_email} onChange={e => set('sender_email', e.target.value)} required type="email" placeholder="tu@email.com" autoComplete="email" maxLength={200} />
           </div>
         </div>
-        <label>Asunto</label>
-        <input value={form.subject} onChange={e => set('subject', e.target.value)} placeholder="Asunto (opcional)" />
-        <label>Mensaje</label>
-        <textarea value={form.body} onChange={e => set('body', e.target.value)} required placeholder="Escribe tu mensaje…" rows={5} />
+        <label htmlFor="mail-subject">Asunto</label>
+        <input id="mail-subject" maxLength={300} value={form.subject} onChange={e => set('subject', e.target.value)} placeholder="Asunto (opcional)" />
+        <label htmlFor="mail-body">Mensaje</label>
+        <textarea id="mail-body" maxLength={5000} value={form.body} onChange={e => set('body', e.target.value)} required placeholder="Escribe tu mensaje…" rows={5} />
         <div className="hint">Tu email no se publicará. Respondo personalmente.</div>
         {typeof status === 'string' && status !== 'idle' && status !== 'sending' && status !== 'sent' && (
           <div className="err">{status}</div>
@@ -537,7 +553,7 @@ function MailApp() {
 }
 
 // ── Terminal App ───────────────────────────────────────────────
-function TerminalApp() {
+function TerminalApp({ autoFocus = true }) {
   const posts = window.BLOG_POSTS || [];
   const [lines, setLines] = useS([
     { type: 'output', text: 'jr-os terminal v1.0 — escribe `help` para ver comandos' },
@@ -624,8 +640,12 @@ function TerminalApp() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={onKey}
-          autoFocus
+          autoFocus={autoFocus}
           spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          enterKeyHint="send"
+          aria-label="Comando de terminal"
         />
       </div>
       <div ref={endRef} />
@@ -665,15 +685,17 @@ function AboutApp() {
       </div>
       <div className="about-section">
         <h3>// contacto</h3>
-        <div className="contact-row"><span className="key">email</span><span>hola@jrobertoma.com</span></div>
-        <div className="contact-row"><span className="key">github</span><span>@jrobertoma</span></div>
-        <div className="contact-row"><span className="key">mastodon</span><span>@jrobertoma@hachyderm.io</span></div>
+        <div className="contact-row"><span className="key">email</span><a href="mailto:hola@jrobertoma.com">hola@jrobertoma.com</a></div>
+        <div className="contact-row"><span className="key">github</span><a href="https://github.com/jrobertoma" target="_blank" rel="noopener noreferrer">@jrobertoma</a></div>
+        <div className="contact-row"><span className="key">mastodon</span><a href="https://hachyderm.io/@jrobertoma" target="_blank" rel="me noopener noreferrer">@jrobertoma@hachyderm.io</a></div>
         <div className="contact-row"><span className="key">rss</span><span>jrobertoma.com/feed.xml</span></div>
       </div>
     </div>
   );
 }
 
+window.usePost     = usePost;
+window.trackView   = trackView;
 window.ReaderApp   = ReaderApp;
 window.CommentsApp = CommentsApp;
 window.FilesApp    = FilesApp;

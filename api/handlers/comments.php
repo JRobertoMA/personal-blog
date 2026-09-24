@@ -33,20 +33,22 @@ if ($method === 'POST' && !$id) {
     $name   = trim($body['author_name'] ?? '');
     $email  = trim($body['author_email'] ?? '');
     $text   = trim($body['body'] ?? '');
-    $hp     = $body['_hp'] ?? null;
-    $ts     = (int)($body['_ts'] ?? 0);
 
-    if ($hp) respond(false, 'Invalid submission', 400);
-    if (time() - $ts < 3) respond(false, 'Envío demasiado rápido', 400);
+    checkAntiBot($body);
     if (!$postId || !$name || !$text) respond(false, 'post_id, author_name y body son requeridos', 400);
-    if (strlen($name) > 120 || strlen($text) > 5000) respond(false, 'Contenido demasiado largo', 400);
+    if (mb_strlen($name) > 120 || mb_strlen($text) > 5000 || mb_strlen($email) > 200) respond(false, 'Contenido demasiado largo', 400);
     if ($email && !filter_var($email, FILTER_VALIDATE_EMAIL)) respond(false, 'Email inválido', 400);
 
     $stmt = $db->prepare("SELECT id FROM posts WHERE id = ? AND status = 'published'");
     $stmt->execute([$postId]);
     if (!$stmt->fetch()) respond(false, 'Post no encontrado', 404);
 
-    $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+    $settings = $db->query("SELECT value FROM settings WHERE key_name = 'comments_enabled'")->fetchColumn();
+    if ($settings !== false && $settings === '0') respond(false, 'Los comentarios están desactivados', 403);
+
+    checkPublicRateLimit('comments', 5, 10);
+
+    $ip = clientIp();
     $db->prepare(
         'INSERT INTO comments (post_id, author_name, author_email, body, status, ip_address) VALUES (?,?,?,?,?,?)'
     )->execute([$postId, $name, $email ?: null, $text, 'pending', $ip]);
@@ -59,6 +61,9 @@ if (in_array($method, ['PATCH','DELETE'])) verifyCsrf();
 
 if ($method === 'PATCH' && $id) {
     $allowed = ['status','body'];
+    if (isset($body['status']) && !in_array($body['status'], ['pending','approved','spam'], true)) {
+        respond(false, 'Estado inválido', 400);
+    }
     $sets = []; $params = [];
     foreach ($allowed as $f) {
         if (array_key_exists($f, $body)) { $sets[] = "$f = ?"; $params[] = $body[$f]; }

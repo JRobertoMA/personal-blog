@@ -36,6 +36,10 @@ function syncTags(PDO $db, string $postId, array $tagNames): void {
 
 // POST /api/posts/:id/view
 if ($method === 'POST' && $id && $sub === 'view') {
+    // Solo cuenta posts publicados que existen (evita inflar la tabla con ids falsos)
+    $stmt = $db->prepare("SELECT 1 FROM posts WHERE id = ? AND status = 'published'");
+    $stmt->execute([$id]);
+    if (!$stmt->fetchColumn()) respond(false, 'Post no encontrado', 404);
     $today = date('Y-m-d');
     $db->prepare(
         'INSERT INTO pageviews (post_id, viewed_date, views) VALUES (?,?,1)
@@ -81,7 +85,10 @@ if ($method === 'GET') {
     if ($cat) { $where[] = 'p.category_id = ?'; $params[] = $cat; }
 
     $q = $_GET['q'] ?? null;
-    if ($q) { $where[] = '(p.title LIKE ? OR p.excerpt LIKE ?)'; $params[] = "%$q%"; $params[] = "%$q%"; }
+    if (is_string($q) && $q !== '') {
+        $like = '%' . addcslashes(mb_substr($q, 0, 100), '%_\\') . '%';
+        $where[] = '(p.title LIKE ? OR p.excerpt LIKE ?)'; $params[] = $like; $params[] = $like;
+    }
 
     $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
@@ -117,9 +124,12 @@ if ($method === 'POST') {
     $status     = $body['status'] ?? 'draft';
     $date       = $body['date'] ?? date('Y-m-d');
     $tags       = (array)($body['tags'] ?? []);
-    $postId     = $body['id'] ?? ('p' . uniqid());
+    $postId     = trim((string)($body['id'] ?? '')) ?: ('p' . uniqid());
 
     if (!$title || !$categoryId) respond(false, 'Título y categoría requeridos', 400);
+    if (!is_string($postId) || !preg_match('/^[a-z0-9-]{1,60}$/', $postId)) {
+        respond(false, 'El slug solo puede contener a-z, 0-9 y guiones (máx. 60)', 400);
+    }
     if (!in_array($status, ['published','draft','scheduled'])) respond(false, 'Estado inválido', 400);
 
     $db->prepare(
@@ -133,6 +143,9 @@ if ($method === 'POST') {
 // PATCH /api/posts/:id
 if ($method === 'PATCH' && $id) {
     $allowed = ['title','body','excerpt','category_id','status','date','scheduled_at'];
+    if (isset($body['status']) && !in_array($body['status'], ['published','draft','scheduled'], true)) {
+        respond(false, 'Estado inválido', 400);
+    }
     $sets = []; $params = [];
     foreach ($allowed as $field) {
         if (array_key_exists($field, $body)) {

@@ -106,9 +106,11 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   INDEX idx_ip_time (ip_address, attempted_at)
 ) ENGINE=InnoDB;
 
--- ─── Default admin (password: changeme — CHANGE IMMEDIATELY) ──────
-INSERT IGNORE INTO admin_users (username, password_hash) VALUES
-  ('admin', '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
+-- ─── Usuario administrador ────────────────────────────────────────
+-- No se incluye ninguna contraseña por defecto. Genera tu hash en local:
+--   php -r 'echo password_hash("TU_CONTRASEÑA_LARGA", PASSWORD_DEFAULT), PHP_EOL;'
+-- y ejecuta en phpMyAdmin (elige un usuario que no sea "admin"):
+--   INSERT INTO admin_users (username, password_hash) VALUES ('tu_usuario', 'PEGA_AQUI_EL_HASH');
 
 -- ─── Categories ───────────────────────────────────────────────────
 INSERT IGNORE INTO categories (id, label, description, color, sort_order) VALUES

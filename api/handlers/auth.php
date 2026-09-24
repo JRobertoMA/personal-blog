@@ -13,25 +13,30 @@ if ($method === 'GET' && $id === 'me') {
 
 // POST /api/auth/login
 if ($method === 'POST' && $id === 'login') {
-    $ip       = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $ip       = clientIp();
     $username = trim($body['username'] ?? '');
     $password = $body['password'] ?? '';
 
     checkLoginRateLimit($ip);
 
-    if (!$username || !$password) respond(false, 'Usuario y contraseña requeridos', 400);
+    if (!is_string($username) || !is_string($password) || !$username || !$password) {
+        respond(false, 'Usuario y contraseña requeridos', 400);
+    }
 
     $db   = getDB();
     $stmt = $db->prepare('SELECT id, username, password_hash FROM admin_users WHERE username = ?');
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
-    if (!$user || !password_verify($password, $user['password_hash'])) {
+    // Hash ficticio para que el tiempo de respuesta no revele si el usuario existe
+    $hash = $user['password_hash'] ?? '$2y$12$HV3Yfb0T0NIMpgL3K/G3luwgQgMLAMI.74UyK2cDr0ooYoomRMLg6';
+    if (!password_verify($password, $hash) || !$user) {
         recordLoginAttempt($ip);
         respond(false, 'Credenciales incorrectas', 401);
     }
 
     session_regenerate_id(true);
+    $_SESSION = [];
     $_SESSION['admin_id']       = $user['id'];
     $_SESSION['admin_username'] = $user['username'];
 
@@ -40,7 +45,13 @@ if ($method === 'POST' && $id === 'login') {
 
 // POST /api/auth/logout
 if ($method === 'POST' && $id === 'logout') {
-    session_destroy();
+    if (isAdmin()) verifyCsrf();
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $_SESSION = [];
+        $p = session_get_cookie_params();
+        setcookie(session_name(), '', ['expires' => time() - 3600, 'path' => $p['path'], 'secure' => $p['secure'], 'httponly' => true, 'samesite' => 'Strict']);
+        session_destroy();
+    }
     respond(true, null);
 }
 

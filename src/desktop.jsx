@@ -69,7 +69,9 @@ const MAX_POST_WINDOWS = 4;
 
 function Desktop({ tweaks, setTweak }) {
   const wm = window.useWindowManager();
-  const [booted,     setBooted]  = useS(!tweaks.showBoot);
+  // Un enlace compartido (#/post/id) va directo al post, sin animación de arranque
+  const sharedPostId = (location.hash.match(/^#\/post\/(.+)$/) || [])[1];
+  const [booted,     setBooted]  = useS(!tweaks.showBoot || !!sharedPostId);
   const [menuOpen,   setMenu]    = useS(false);
   const [menuQuery,  setMQ]      = useS('');
   const [commentsPostId, setCommentsPostId] = useS(null);
@@ -142,9 +144,11 @@ function Desktop({ tweaks, setTweak }) {
 
   openAppRef.current = openApp;
 
-  // Open About on first load
+  // Al arrancar: abre el post enlazado o, si no hay, "Acerca de mí"
   useEffect(() => {
-    if (booted) setTimeout(() => openApp('about'), 300);
+    if (!booted) return;
+    const id = sharedPostId && decodeURIComponent(sharedPostId);
+    setTimeout(() => (id ? openPost(id) : openApp('about')), 300);
   }, [booted]);
 
   const filteredApps = APPS.filter(a => !menuQuery || a.title.toLowerCase().includes(menuQuery.toLowerCase()));

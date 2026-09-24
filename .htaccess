@@ -1,17 +1,54 @@
+# jrobertoma.com — configuración Apache (IONOS hosting compartido)
 Options -Indexes
+DirectoryIndex index.html
 RewriteEngine On
 
-# Protect .env and config files
-<FilesMatch "^\.env|config\.ini">
+# ─── Forzar HTTPS (activa el certificado SSL en el panel de IONOS primero) ───
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# ─── Bloquear archivos sensibles ─────────────────────────────────────────────
+# .env, .git, .htpasswd, dumps SQL, código fuente y ficheros de build
+<FilesMatch "(^\.|\.(sql|md|log|ini|sh|bak|old|orig|swp|lock|dist)$|^(package(-lock)?\.json|build\.mjs)$)">
   Require all denied
 </FilesMatch>
+RewriteRule (^|/)\.(?!well-known/) - [F,L]
+RewriteRule ^(src|node_modules|docs)(/|$) - [F,L]
 
-# API routes → PHP router
-RewriteRule ^api/(.*)$ api/index.php [L,QSA]
+# ─── Cabeceras de seguridad ──────────────────────────────────────────────────
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+  # Activa HSTS solo cuando confirmes que HTTPS funciona bien en todo el dominio
+  # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
 
-# Static files served directly
-RewriteCond %{REQUEST_FILENAME} -f
+# ─── Caché de estáticos ──────────────────────────────────────────────────────
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 7 days"
+  ExpiresByType application/javascript "access plus 7 days"
+  ExpiresByType image/webp "access plus 30 days"
+  ExpiresByType image/png "access plus 30 days"
+  ExpiresByType image/jpeg "access plus 30 days"
+  ExpiresByType image/svg+xml "access plus 30 days"
+</IfModule>
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
+
+# ─── API → router PHP ────────────────────────────────────────────────────────
+RewriteRule ^api(/.*)?$ api/index.php [END,QSA]
+
+# ─── Estáticos existentes se sirven tal cual ─────────────────────────────────
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# SPA fallback → index.html
+# ─── Fallback SPA ────────────────────────────────────────────────────────────
 RewriteRule ^ index.html [L]

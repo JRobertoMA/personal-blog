@@ -10,16 +10,17 @@ if ($method === 'POST' && !$id) {
     $email   = trim($body['sender_email'] ?? '');
     $subject = trim($body['subject'] ?? '');
     $text    = trim($body['body'] ?? '');
-    $hp      = $body['_hp'] ?? null;
-    $ts      = (int)($body['_ts'] ?? 0);
 
-    if ($hp) respond(false, 'Invalid submission', 400);
-    if (time() - $ts < 3) respond(false, 'Envío demasiado rápido', 400);
+    checkAntiBot($body);
     if (!$name || !$email || !$text) respond(false, 'Nombre, email y mensaje son requeridos', 400);
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) respond(false, 'Email inválido', 400);
-    if (strlen($text) > 5000) respond(false, 'Mensaje demasiado largo', 400);
+    if (mb_strlen($text) > 5000 || mb_strlen($name) > 120 || mb_strlen($email) > 200 || mb_strlen($subject) > 300) {
+        respond(false, 'Mensaje demasiado largo', 400);
+    }
 
-    $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+    checkPublicRateLimit('messages', 3, 30);
+
+    $ip = clientIp();
     $db->prepare(
         'INSERT INTO messages (sender_name, sender_email, subject, body, ip_address) VALUES (?,?,?,?,?)'
     )->execute([$name, $email, $subject ?: null, $text, $ip]);

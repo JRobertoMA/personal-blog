@@ -22,14 +22,14 @@ if (in_array($method, ['POST','DELETE'])) verifyCsrf();
 // POST /api/tags
 if ($method === 'POST') {
     $name = trim($body['name'] ?? '');
-    if (!$name) respond(false, 'name requerido', 400);
+    if (!$name || mb_strlen($name) > 80) respond(false, 'name requerido (máx. 80)', 400);
     $db->prepare('INSERT IGNORE INTO tags (name) VALUES (?)')->execute([$name]);
     respond(true, ['name' => $name], 201);
 }
 
 // DELETE /api/tags/:name
 if ($method === 'DELETE' && $id) {
-    $name = urldecode($id);
+    $name = $id;
     $stmt = $db->prepare('SELECT id FROM tags WHERE name = ?');
     $stmt->execute([$name]);
     $tag = $stmt->fetch();

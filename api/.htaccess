@@ -1,4 +1,8 @@
-# Only index.php is accessible directly; all other PHP files are handlers
-<FilesMatch "^(?!index\.php$).*\.php$">
+# Solo index.php es accesible; handlers, config y middleware quedan bloqueados
+Options -Indexes
+<FilesMatch "\.php$">
   Require all denied
 </FilesMatch>
+<Files "index.php">
+  Require all granted
+</Files>

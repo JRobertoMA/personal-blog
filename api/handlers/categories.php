@@ -28,6 +28,8 @@ if ($method === 'POST') {
     $order = (int)($body['sort_order'] ?? 0);
 
     if (!$catId || !$label) respond(false, 'id y label requeridos', 400);
+    if (!preg_match('/^[a-z0-9-]{1,50}$/', $catId)) respond(false, 'id inválido (a-z, 0-9, guiones)', 400);
+    if (!preg_match('/^#[0-9a-fA-F]{6}$/', $color)) respond(false, 'Color inválido', 400);
 
     $db->prepare(
         'INSERT INTO categories (id, label, description, color, sort_order) VALUES (?,?,?,?,?)'
@@ -39,6 +41,9 @@ if ($method === 'POST') {
 if ($method === 'PATCH' && $id) {
     $allowed = ['label','description','color','sort_order'];
     $sets = []; $params = [];
+    if (array_key_exists('color', $body) && !preg_match('/^#[0-9a-fA-F]{6}$/', (string)$body['color'])) {
+        respond(false, 'Color inválido', 400);
+    }
     foreach ($allowed as $field) {
         if (array_key_exists($field, $body)) {
             $sets[]   = "$field = ?";
