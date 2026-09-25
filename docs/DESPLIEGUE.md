@@ -46,6 +46,12 @@ En **Dominios y SSL → tu dominio → Destino**, apunta el dominio a `/blog`.
 
 Copia `.env.example` como `.env`, rellena los datos de IONOS y súbelo a `/`.
 
+- Si la contraseña de la base de datos tiene comillas, `#` u otros símbolos, escríbela entre **comillas simples**
+  (`DB_PASS='…'`). Reglas completas en [PROBLEMAS-IONOS.md](PROBLEMAS-IONOS.md#reglas-para-escribir-valores-en-el-env).
+- Añade `LOG_FILE=personal-blog-errors.log` para poder ver los errores de la API: IONOS no da acceso al log de PHP.
+
+Si algo falla tras subirlo (404 en la API, 500, «Error interno del servidor»), ver [PROBLEMAS-IONOS.md](PROBLEMAS-IONOS.md).
+
 ## 4. PHP y SSL
 
 - **PHP ≥ 8.1** (en *Hosting → PHP*). Se usa `str_starts_with`, arrow functions, etc.

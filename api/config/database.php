@@ -8,7 +8,12 @@ function parseEnvFile(string $path): array {
         if ($line === '' || $line[0] === '#' || $line[0] === ';') continue;
         if (!preg_match('/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/', $line, $m)) continue;
         $value = $m[2];
-        if (preg_match('/^"((?:[^"\\\\]|\\\\.)*)"/', $value, $q)) {
+        $whole = rtrim($value);
+        if (strlen($whole) >= 2 && $whole[0] === '"' && substr($whole, -1) === '"') {
+            // Todo el valor entre comillas dobles: se toma hasta la ÚLTIMA comilla,
+            // así una contraseña con " o # dentro no se corta en la primera.
+            $value = strtr(substr($whole, 1, -1), ['\\"' => '"', '\\\\' => '\\']);
+        } elseif (preg_match('/^"((?:[^"\\\\]|\\\\.)*)"/', $value, $q)) {
             $value = strtr($q[1], ['\\"' => '"', '\\\\' => '\\']);
         } elseif (preg_match("/^'([^']*)'/", $value, $q)) {
             $value = $q[1];
@@ -24,21 +29,42 @@ function parseEnvFile(string $path): array {
 // y como último recurso en la raíz del proyecto. Solo acepta uno que tenga
 // DB_NAME, para no tomar por error el .env de otra aplicación.
 function loadEnv(): array {
-    static $env = null;
-    if ($env !== null) return $env;
+    return envState()['vars'];
+}
+
+// Carpeta donde está el .env usado (null si no se encontró ninguno)
+function envDir(): ?string {
+    return envState()['dir'];
+}
+
+function envState(): array {
+    static $state = null;
+    if ($state !== null) return $state;
     $paths = [
         __DIR__ . '/../../../../.env',
         __DIR__ . '/../../../.env',
         __DIR__ . '/../../.env',
     ];
-    $env = [];
+    $state = ['vars' => [], 'dir' => null];
     foreach ($paths as $path) {
         if (!is_readable($path)) continue;
         $parsed = parseEnvFile($path);
-        if (isset($parsed['DB_NAME'])) { $env = $parsed; break; }
+        if (isset($parsed['DB_NAME'])) { $state = ['vars' => $parsed, 'dir' => dirname(realpath($path))]; break; }
     }
-    if (!$env) error_log('[jrobertoma api] No se encontró un .env válido con DB_NAME');
-    return $env;
+    if (!$state['vars']) error_log('[jrobertoma api] No se encontró un .env válido con DB_NAME');
+    return $state;
+}
+
+// Registro de errores de la API. En hosting compartido (IONOS) el log de Apache
+// no es accesible: con LOG_FILE en el .env se escribe en un archivo propio.
+// Una ruta relativa se resuelve desde la carpeta del .env (fuera de la web).
+function apiLog(string $message): void {
+    $line = '[jrobertoma api] ' . $message;
+    $file = envVar('LOG_FILE');
+    if ($file !== '' && $file[0] !== '/' && envDir()) $file = envDir() . '/' . $file;
+    if ($file === '' || !@error_log('[' . date('Y-m-d H:i:s') . '] ' . $line . PHP_EOL, 3, $file)) {
+        error_log($line); // sin LOG_FILE, o si no se puede escribir: log del servidor
+    }
 }
 
 function envVar(string $key, string $default = ''): string {

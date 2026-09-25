@@ -43,7 +43,7 @@ function respond(bool $ok, $data = null, int $code = 200): void {
 }
 
 set_exception_handler(function (Throwable $e) {
-    error_log('[jrobertoma api] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    apiLog($e->getMessage() . ' @ ' . basename(dirname($e->getFile())) . '/' . basename($e->getFile()) . ':' . $e->getLine());
     respond(false, 'Error interno del servidor', 500);
 });
 

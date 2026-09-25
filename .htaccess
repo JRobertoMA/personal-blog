@@ -3,6 +3,14 @@ Options -Indexes
 DirectoryIndex index.html
 RewriteEngine On
 
+# ─── Carpeta base del proyecto ───────────────────────────────────────────────
+# BASE = "" en la raíz del dominio (IONOS) o "/personal-blog" en local.
+# Todas las reescrituras van a rutas ABSOLUTAS con %{ENV:BASE}: en IONOS un
+# destino relativo ("index.html") se resuelve contra la ruta física del hosting
+# y acaba en 404/500, y "RewriteBase /" rompería la copia local en subcarpeta.
+RewriteCond %{REQUEST_URI}::$0 ^(/.+)/(.*)::\2$
+RewriteRule .* - [E=BASE:%1]
+
 # ─── Forzar HTTPS (el certificado lo pone Cloudflare, ver docs/CLOUDFLARE.md) ───
 # No se aplica en local (localhost / IPs privadas), donde no hay certificado.
 RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$ [NC]
@@ -45,7 +53,7 @@ RewriteRule ^(src|node_modules|docs)(/|$) - [F,L]
 </IfModule>
 
 # ─── API → router PHP ────────────────────────────────────────────────────────
-RewriteRule ^api(/.*)?$ api/index.php [END,QSA]
+RewriteRule ^api(/.*)?$ %{ENV:BASE}/api/index.php [END,QSA]
 
 # ─── Estáticos existentes se sirven tal cual ─────────────────────────────────
 RewriteCond %{REQUEST_FILENAME} -f [OR]
@@ -53,4 +61,4 @@ RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
 # ─── Fallback SPA ────────────────────────────────────────────────────────────
-RewriteRule ^ index.html [L]
+RewriteRule ^ %{ENV:BASE}/index.html [END]
