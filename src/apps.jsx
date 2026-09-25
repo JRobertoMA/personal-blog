@@ -30,6 +30,15 @@ function usePost(id) {
   return { ...state, post: state.post ? { ...summary, ...state.post } : summary };
 }
 
+// Imagen dentro de un post → misma ventana que la galería (una por imagen)
+const inlineImageOpener = (openImage) => openImage && ((src, alt, img) => openImage({
+  id: 'md-' + src,
+  url: src,
+  original_name: alt || decodeURIComponent(src.split('/').pop() || 'Imagen'),
+  width: img?.naturalWidth || null,
+  height: img?.naturalHeight || null,
+}));
+
 // Cuenta una visita por post y por sesión del navegador
 function trackView(id) {
   if (!id) return;
@@ -48,7 +57,7 @@ const CAT_COLORS = {
 };
 
 // ── Reader App ─────────────────────────────────────────────────
-function ReaderApp({ onOpenComments }) {
+function ReaderApp({ onOpenComments, onOpenImage }) {
   const posts = window.BLOG_POSTS || [];
   const [currentId, setCurrentId] = useS(posts[0]?.id || null);
   const { post, loading } = usePost(currentId);
@@ -78,7 +87,7 @@ function ReaderApp({ onOpenComments }) {
             </div>
             {loading && !post.body
               ? <div style={{ color: 'var(--text-faint)', fontSize: 13 }}>cargando…</div>
-              : <div className="post-body" dangerouslySetInnerHTML={{ __html: md(post.body) }} />}
+              : <window.PostBody body={post.body} onOpenImage={inlineImageOpener(onOpenImage)} />}
             <h2>// fin</h2>
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-faint)' }}>
               ─── Gracias por leer. — {window.aboutInitials()}
@@ -274,7 +283,7 @@ function FilesApp({ onOpenPost, onOpenApp }) {
 }
 
 // ── Post App (ventana individual de post) ──────────────────────
-function PostApp({ postId, onOpenComments }) {
+function PostApp({ postId, onOpenComments, onOpenImage }) {
   const { post, loading, error } = usePost(postId);
 
   useEffect(() => { trackView(postId); }, [postId]);
@@ -290,7 +299,7 @@ function PostApp({ postId, onOpenComments }) {
       </div>
       {loading && !post.body
         ? <div style={{ color: 'var(--text-faint)', fontSize: 13 }}>cargando…</div>
-        : <div className="post-body" dangerouslySetInnerHTML={{ __html: md(post.body) }} />}
+        : <window.PostBody body={post.body} onOpenImage={inlineImageOpener(onOpenImage)} />}
       <h2>// fin</h2>
       <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-faint)' }}>─── Gracias por leer. — {window.aboutInitials()}</p>
       <div style={{ marginTop: 8 }}>
@@ -871,7 +880,7 @@ function AboutApp() {
       {a.bio && (
         <div className="about-section">
           <h3>// whoami</h3>
-          <div className="about-bio" dangerouslySetInnerHTML={{ __html: md(a.bio) }} />
+          <div className="about-bio md" dangerouslySetInnerHTML={{ __html: md(a.bio) }} />
         </div>
       )}
       {stack.length > 0 && (

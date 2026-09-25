@@ -3,6 +3,7 @@
 import './globals.js';
 import './markdown.js';
 import './notes.js';
+import './post-body.jsx';
 import './tweaks-panel.jsx';
 import './window-manager.jsx';
 import './apps.jsx';

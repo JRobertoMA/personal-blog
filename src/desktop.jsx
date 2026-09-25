@@ -140,7 +140,7 @@ function Desktop({ tweaks, setTweak }) {
       id: winId,
       title: post.title,
       icon: '📄',
-      content: <window.PostApp postId={postId} onOpenComments={act.openComments} />,
+      content: <window.PostApp postId={postId} onOpenComments={act.openComments} onOpenImage={act.openImage} />,
       width: 640, height: 480,
     });
   }, [wm, click, openComments]);
@@ -154,7 +154,7 @@ function Desktop({ tweaks, setTweak }) {
     let content;
     // Las ventanas guardan su contenido al abrirse: se les pasan las funciones
     // estables de `act`, que siempre llaman a la versión actual.
-    if      (appId === 'reader')   content = <window.ReaderApp onOpenComments={act.openComments} />;
+    if      (appId === 'reader')   content = <window.ReaderApp onOpenComments={act.openComments} onOpenImage={act.openImage} />;
     else if (appId === 'files')    content = <window.FilesApp onOpenPost={act.openPost} onOpenApp={act.openApp} />;
     else if (appId === 'notes')    content = <window.NotesApp />;
     else if (appId === 'tags')     content = <window.TagsApp openPost={act.openPost} />;

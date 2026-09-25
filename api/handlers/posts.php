@@ -132,6 +132,10 @@ if ($method === 'POST') {
     }
     if (!in_array($status, ['published','draft','scheduled'])) respond(false, 'Estado inválido', 400);
 
+    $exists = $db->prepare('SELECT 1 FROM posts WHERE id = ?');
+    $exists->execute([$postId]);
+    if ($exists->fetchColumn()) respond(false, "Ya existe un post con el slug «{$postId}»", 409);
+
     $db->prepare(
         'INSERT INTO posts (id, title, body, excerpt, category_id, status, date) VALUES (?,?,?,?,?,?,?)'
     )->execute([$postId, $title, $postBody, $excerpt, $categoryId, $status, $date]);
@@ -145,6 +149,15 @@ if ($method === 'PATCH' && $id) {
     $allowed = ['title','body','excerpt','category_id','status','date','scheduled_at'];
     if (isset($body['status']) && !in_array($body['status'], ['published','draft','scheduled'], true)) {
         respond(false, 'Estado inválido', 400);
+    }
+    // Un cuerpo vacío sobre un post con contenido casi siempre es un error del cliente
+    // (p. ej. editar con datos incompletos): exige confirmarlo con force_empty_body.
+    if (array_key_exists('body', $body) && trim((string)$body['body']) === '' && empty($body['force_empty_body'])) {
+        $cur = $db->prepare('SELECT body FROM posts WHERE id = ?');
+        $cur->execute([$id]);
+        if (trim((string)$cur->fetchColumn()) !== '') {
+            respond(false, 'El contenido está vacío y el post guardado no lo está; no se ha sobrescrito', 409);
+        }
     }
     $sets = []; $params = [];
     foreach ($allowed as $field) {
