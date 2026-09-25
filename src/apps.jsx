@@ -81,7 +81,7 @@ function ReaderApp({ onOpenComments }) {
               : <div className="post-body" dangerouslySetInnerHTML={{ __html: md(post.body) }} />}
             <h2>// fin</h2>
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-faint)' }}>
-              ─── Gracias por leer. — JR
+              ─── Gracias por leer. — {window.aboutInitials()}
             </p>
             {onOpenComments && (
               <div style={{ marginTop: 8 }}>
@@ -100,7 +100,7 @@ function ReaderApp({ onOpenComments }) {
 }
 
 // ── Comments Section ───────────────────────────────────────────
-function CommentsApp({ postId }) {
+function CommentsApp({ postId, showPostTitle = true }) {
   const [comments, setComments] = useS([]);
   const [name,  setName]  = useS(() => localStorage.getItem('jr-comment-name')  || '');
   const [email, setEmail] = useS(() => localStorage.getItem('jr-comment-email') || '');
@@ -108,7 +108,9 @@ function CommentsApp({ postId }) {
   const [status, setStatus] = useS('idle');
   const tsRef = useRef(Date.now());
 
-  const pid = postId || ((window.BLOG_POSTS || [])[0]?.id);
+  // Siempre los de un post concreto: sin post no hay comentarios que mostrar
+  const pid = postId;
+  const post = (window.BLOG_POSTS || []).find(p => p.id === pid);
 
   useEffect(() => {
     if (!pid) return;
@@ -145,10 +147,15 @@ function CommentsApp({ postId }) {
     }
   };
 
+  if (!pid) {
+    return <div className="app-scroll"><div className="comments-section" style={{ color: 'var(--text-faint)', fontSize: 12 }}>Abre un post para ver sus comentarios.</div></div>;
+  }
+
   return (
     <div className="app-scroll">
       <div className="comments-section">
         <h3>Comentarios</h3>
+        {showPostTitle && post && <div className="comments-post">sobre «{post.title}»</div>}
         {comments.length === 0 && (
           <div style={{ color: 'var(--text-faint)', fontSize: 12, marginBottom: 16 }}>
             Sé el primero en comentar.
@@ -164,7 +171,7 @@ function CommentsApp({ postId }) {
           </div>
         ))}
         {status === 'sent' ? (
-          <div style={{ padding: '12px', background: 'rgba(57,255,20,0.08)', border: '1px solid rgba(57,255,20,0.2)', borderRadius: 6, fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
+          <div style={{ padding: '12px', background: 'rgba(var(--neon-rgb),0.08)', border: '1px solid rgba(var(--neon-rgb),0.2)', borderRadius: 6, fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
             Comentario enviado, pendiente de moderación.
           </div>
         ) : (
@@ -186,37 +193,58 @@ function CommentsApp({ postId }) {
 }
 
 // ── Files App ──────────────────────────────────────────────────
-function FilesApp({ onOpenPost }) {
+// Ubicaciones: todos · recientes · destacados · categoría. ← → recorren el
+// historial de ubicaciones, ↑ vuelve a todos y ⌕ abre la app Buscar.
+const FX_RECENT = 5;
+const FX_FEATURED = 5;
+
+function FilesApp({ onOpenPost, onOpenApp }) {
   const posts = window.BLOG_POSTS || [];
   const cats  = window.BLOG_CATEGORIES || [];
-  const [cat, setCat] = useS('all');
+  const [nav, setNav] = useS({ stack: ['all'], idx: 0 });
+  const loc = nav.stack[nav.idx];
 
-  const filtered = cat === 'all' ? posts : posts.filter(p => p.category_id === cat);
+  const go = (next) => setNav(n => (n.stack[n.idx] === next ? n
+    : { stack: [...n.stack.slice(0, n.idx + 1), next], idx: n.idx + 1 }));
+  const back    = () => setNav(n => ({ ...n, idx: Math.max(0, n.idx - 1) }));
+  const forward = () => setNav(n => ({ ...n, idx: Math.min(n.stack.length - 1, n.idx + 1) }));
+
+  const byDate = [...posts].sort((a, b) => (a.date < b.date ? 1 : -1));
+  let filtered, path;
+  if (loc === 'recent') {
+    filtered = byDate.slice(0, FX_RECENT); path = 'recientes/';
+  } else if (loc === 'featured') {
+    filtered = [...posts].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, FX_FEATURED); path = 'destacados/';
+  } else if (loc.startsWith('cat:')) {
+    const id = loc.slice(4);
+    filtered = byDate.filter(p => p.category_id === id); path = id + '/';
+  } else {
+    filtered = byDate; path = '';
+  }
+
+  const item = (id, icon, label, color) => (
+    <div className={`item${loc === id ? ' active' : ''}`} onClick={() => go(id)}>
+      <span style={color ? { color } : undefined}>{icon}</span>{label}
+    </div>
+  );
 
   return (
     <div className="fx">
       <div className="fx-toolbar">
-        <button>←</button>
-        <button>→</button>
-        <button>↑</button>
-        <div className="fx-path">/home/jr/posts/{cat === 'all' ? '' : cat + '/'}</div>
-        <button>⌕</button>
-        <button>≡</button>
+        <button onClick={back} disabled={nav.idx === 0} title="Atrás" aria-label="Atrás">←</button>
+        <button onClick={forward} disabled={nav.idx >= nav.stack.length - 1} title="Adelante" aria-label="Adelante">→</button>
+        <button onClick={() => go('all')} disabled={loc === 'all'} title="Subir a /posts" aria-label="Subir">↑</button>
+        <div className="fx-path">/home/jr/posts/{path}</div>
+        {onOpenApp && <button onClick={() => onOpenApp('search')} title="Buscar posts" aria-label="Buscar">⌕</button>}
       </div>
       <div className="fx-main">
         <div className="fx-sidebar">
           <div className="group">Lugares</div>
-          <div className={`item${cat === 'all' ? ' active' : ''}`} onClick={() => setCat('all')}><span>📁</span>todos</div>
-          <div className="item"><span>⭐</span>destacados</div>
-          <div className="item"><span>🕒</span>recientes</div>
+          {item('all', '📁', 'todos')}
+          {item('featured', '⭐', 'destacados')}
+          {item('recent', '🕒', 'recientes')}
           <div className="group">Categorías</div>
-          {cats.map(c => (
-            <div key={c.id} className={`item${cat === c.id ? ' active' : ''}`} onClick={() => setCat(c.id)}>
-              <span style={{ color: c.color }}>●</span>{c.label.toLowerCase()}
-            </div>
-          ))}
-          <div className="group">Discos</div>
-          <div className="item"><span>💾</span>jr-blog 2.4G</div>
+          {cats.map(c => <React.Fragment key={c.id}>{item('cat:' + c.id, '●', c.label.toLowerCase(), c.color)}</React.Fragment>)}
         </div>
         <div className="fx-list">
           <div className="fx-row header">
@@ -224,24 +252,22 @@ function FilesApp({ onOpenPost }) {
             <span>Nombre</span>
             <span>Categoría</span>
             <span>Fecha</span>
-            <span>Tags</span>
+            <span>{loc === 'featured' ? 'Vistas' : 'Tags'}</span>
           </div>
+          {filtered.length === 0 && <div className="fx-empty">// carpeta vacía</div>}
           {filtered.map(p => (
-            <div key={p.id} className="fx-row"
-              onClick={() => onOpenPost && onOpenPost(p.id)}
-              onDoubleClick={() => onOpenPost && onOpenPost(p.id)}
-            >
+            <div key={p.id} className="fx-row" onClick={() => onOpenPost && onOpenPost(p.id)} title="Abrir post">
               <span>📄</span>
               <span className="name">{p.title}.md</span>
               <span>{p.category_label || p.category_id}</span>
               <span>{p.date}</span>
-              <span>{(p.tags || []).length}</span>
+              <span>{loc === 'featured' ? (p.views || 0) : (p.tags || []).length}</span>
             </div>
           ))}
         </div>
       </div>
       <div className="fx-statusbar">
-        {filtered.length} archivo(s) · {cats.length} categorías · libre: 1.2 TB
+        {filtered.length} archivo(s) · {cats.length} categorías
       </div>
     </div>
   );
@@ -266,7 +292,7 @@ function PostApp({ postId, onOpenComments }) {
         ? <div style={{ color: 'var(--text-faint)', fontSize: 13 }}>cargando…</div>
         : <div className="post-body" dangerouslySetInnerHTML={{ __html: md(post.body) }} />}
       <h2>// fin</h2>
-      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-faint)' }}>─── Gracias por leer. — JR</p>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-faint)' }}>─── Gracias por leer. — {window.aboutInitials()}</p>
       <div style={{ marginTop: 8 }}>
         <button className="btn-neon" onClick={() => onOpenComments && onOpenComments(post.id)}>
           Comentarios ({post.comment_count || 0})
@@ -278,32 +304,33 @@ function PostApp({ postId, onOpenComments }) {
 
 // ── Notes App ──────────────────────────────────────────────────
 function NotesApp() {
-  const today = new Date().toLocaleDateString('es-ES', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const [text, setText] = useS(null);
+  useEffect(() => {
+    fetch('api/notes').then(r => r.json())
+      .then(res => setText(res.ok ? res.data.text : ''))
+      .catch(() => setText(''));
+  }, []);
+
+  if (text === null) return <div className="notes"><div className="scribble">cargando…</div></div>;
+  const lines = window.parseNotes(text);
+  if (!lines.some(l => l.type !== 'blank')) return <div className="notes"><div className="scribble">// sin notas</div></div>;
   return (
     <div className="notes">
-      <div className="star">★ NOTAS PERSONALES — {today}</div>
-      <div>&nbsp;</div>
-      <div>· terminar post sobre tmux antes del viernes</div>
-      <div>· investigar por qué el ventilador hace ruido a 3000 rpm</div>
-      <div className="scribble">· (probable: cable EPS rozando el aspa)</div>
-      <div>&nbsp;</div>
-      <div className="star">★ ideas que pueden ser posts</div>
-      <div>· ¿es razonable correr Postgres en una raspberry pi 5?</div>
-      <div>· historia de los terminales: de VT100 al emulador moderno</div>
-      <div>· nftables vs iptables: cuándo migrar</div>
-      <div>&nbsp;</div>
-      <div className="star">★ pendientes</div>
-      <div>· actualizar la pi a bookworm</div>
-      <div>· montar raid1 en el NAS</div>
-      <div className="scribble">· (comprar dos discos de 4TB antes de que suban de precio)</div>
+      {lines.map((l, i) => (
+        <div key={i} className={l.type === 'star' ? 'star' : l.type === 'scribble' ? 'scribble' : undefined}>
+          {l.type === 'blank' ? '\u00a0' : window.NOTE_PREFIX[l.type] + l.text}
+        </div>
+      ))}
     </div>
   );
 }
 
 // ── Tags App ───────────────────────────────────────────────────
+// Pulsar un tag o una categoría lista sus posts; pulsar un post lo abre.
 function TagsApp({ openPost }) {
   const posts = window.BLOG_POSTS || [];
   const cats  = window.BLOG_CATEGORIES || [];
+  const [sel, setSel] = useS(null); // { type: 'tag' | 'cat', value, label }
 
   const allTags = useMemo(() => {
     const map = {};
@@ -313,27 +340,52 @@ function TagsApp({ openPost }) {
 
   const sizes = [11, 13, 15, 18, 22];
   const max = Math.max(...allTags.map(t => t[1]), 1);
+  const toggle = (next) => setSel(s => (s && s.type === next.type && s.value === next.value ? null : next));
+  const isSel = (type, value) => sel && sel.type === type && sel.value === value;
+
+  const matches = !sel ? [] : posts.filter(p =>
+    sel.type === 'tag' ? (p.tags || []).includes(sel.value) : p.category_id === sel.value);
 
   return (
     <div className="tags-app">
       <h2>Tags & Categorías</h2>
-      <div className="sub">// {allTags.length} tags totales · {cats.length} categorías</div>
+      <div className="sub">// {allTags.length} tags totales · {cats.length} categorías · pulsa uno para ver sus posts</div>
       <div className="tags-cloud">
         {allTags.map(([tag, count]) => (
-          <span key={tag} className="tag-chip"
+          <button key={tag} className={`tag-chip${isSel('tag', tag) ? ' active' : ''}`}
             style={{ fontSize: sizes[Math.min(sizes.length-1, Math.floor((count/max)*sizes.length))] }}
-            onClick={() => openPost && openPost(posts.find(p=>(p.tags||[]).includes(tag))?.id)}
+            onClick={() => toggle({ type: 'tag', value: tag, label: '#' + tag })}
+            aria-pressed={isSel('tag', tag)}
           >
             #{tag} <span className="count">{count}</span>
-          </span>
+          </button>
         ))}
       </div>
+
+      {sel && (
+        <div className="tags-results">
+          <div className="tags-results-head">
+            <span>{sel.label} · {matches.length} post{matches.length !== 1 ? 's' : ''}</span>
+            <button onClick={() => setSel(null)} aria-label="Cerrar lista">✕</button>
+          </div>
+          {matches.map(p => (
+            <div key={p.id} className="search-result" onClick={() => openPost && openPost(p.id)}>
+              <div className="title">{p.title}</div>
+              <div className="meta">{p.date} · {p.category_label || p.category_id}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 16, color: 'var(--text)', margin: '0 0 12px' }}>Categorías</h2>
       {cats.map(c => {
         const n = posts.filter(p => p.category_id === c.id).length;
         return (
-          <div key={c.id} className="cat-card" style={{ borderLeftColor: c.color || 'var(--neon)' }}>
+          <div key={c.id} className={`cat-card${isSel('cat', c.id) ? ' active' : ''}`} style={{ borderLeftColor: c.color || 'var(--neon)' }}
+            onClick={() => toggle({ type: 'cat', value: c.id, label: c.label })} role="button" tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter') toggle({ type: 'cat', value: c.id, label: c.label }); }}>
             <div className="name">{c.label} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>· {n} post{n !== 1 ? 's' : ''}</span></div>
+            {c.description && <div className="desc">{c.description}</div>}
           </div>
         );
       })}
@@ -391,10 +443,13 @@ function SearchApp({ openPost }) {
 }
 
 // ── Calendar App ───────────────────────────────────────────────
-function CalendarApp() {
+// Los días con post se pueden pulsar; debajo se listan los posts del mes
+// (o del día elegido) y cada uno abre su ventana.
+function CalendarApp({ openPost }) {
   const posts = window.BLOG_POSTS || [];
   const today = new Date();
   const [view, setView] = useS({ y: today.getFullYear(), m: today.getMonth() });
+  const [day, setDay] = useS(null);
 
   const monthName = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][view.m];
   const first  = new Date(view.y, view.m, 1);
@@ -404,23 +459,24 @@ function CalendarApp() {
   for (let i = 0; i < offset; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
-  const postDays = useMemo(() => new Set(
-    posts
-      .filter(p => p.date.startsWith(`${view.y}-${String(view.m + 1).padStart(2,'0')}`))
-      .map(p => parseInt(p.date.slice(8, 10), 10))
-  ), [posts, view.y, view.m]);
+  const prefix = `${view.y}-${String(view.m + 1).padStart(2,'0')}`;
+  const monthPosts = useMemo(() => posts.filter(p => (p.date || '').startsWith(prefix)).sort((a, b) => (a.date < b.date ? -1 : 1)), [posts, prefix]);
+  const postDays = useMemo(() => new Set(monthPosts.map(p => parseInt(p.date.slice(8, 10), 10))), [monthPosts]);
+  const listed = day ? monthPosts.filter(p => parseInt(p.date.slice(8, 10), 10) === day) : monthPosts;
 
-  const prev = () => setView(v => v.m === 0  ? { y: v.y-1, m: 11 } : { y: v.y, m: v.m-1 });
-  const next = () => setView(v => v.m === 11 ? { y: v.y+1, m: 0  } : { y: v.y, m: v.m+1 });
+  const move = (fn) => { setView(fn); setDay(null); };
+  const prev = () => move(v => v.m === 0  ? { y: v.y-1, m: 11 } : { y: v.y, m: v.m-1 });
+  const next = () => move(v => v.m === 11 ? { y: v.y+1, m: 0  } : { y: v.y, m: v.m+1 });
+  const navBtn = { background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 4, height: 28, cursor: 'pointer' };
 
   return (
     <div className="cal">
       <div className="cal-header">
         <h3>{monthName} {view.y}</h3>
         <div style={{ display: 'flex', gap: 4 }}>
-          <button onClick={prev} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 4, width: 28, height: 28, cursor: 'pointer' }}>‹</button>
-          <button onClick={() => setView({ y: today.getFullYear(), m: today.getMonth() })} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 4, padding: '0 10px', height: 28, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11 }}>hoy</button>
-          <button onClick={next} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 4, width: 28, height: 28, cursor: 'pointer' }}>›</button>
+          <button onClick={prev} style={{ ...navBtn, width: 28 }} aria-label="Mes anterior">‹</button>
+          <button onClick={() => move(() => ({ y: today.getFullYear(), m: today.getMonth() }))} style={{ ...navBtn, padding: '0 10px', fontFamily: 'var(--font-mono)', fontSize: 11 }}>hoy</button>
+          <button onClick={next} style={{ ...navBtn, width: 28 }} aria-label="Mes siguiente">›</button>
         </div>
       </div>
       <div className="cal-grid">
@@ -429,56 +485,133 @@ function CalendarApp() {
           if (d === null) return <div key={i} className="cal-cell empty"></div>;
           const isToday = view.y === today.getFullYear() && view.m === today.getMonth() && d === today.getDate();
           const hasPost = postDays.has(d);
-          return <div key={i} className={`cal-cell${isToday ? ' today' : ''}${hasPost ? ' has-post' : ''}`}>{d}</div>;
+          const cls = `cal-cell${isToday ? ' today' : ''}${hasPost ? ' has-post' : ''}${day === d ? ' selected' : ''}`;
+          return hasPost
+            ? <button key={i} className={cls} onClick={() => setDay(x => (x === d ? null : d))} aria-pressed={day === d} title="Ver posts de este día">{d}</button>
+            : <div key={i} className={cls}>{d}</div>;
         })}
       </div>
       <div style={{ marginTop: 18, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-faint)', display: 'flex', gap: 16 }}>
         <span><span style={{ color: 'var(--neon)' }}>■</span> hoy</span>
-        <span><span style={{ color: 'var(--accent-pink)' }}>●</span> post publicado</span>
+        <span><span style={{ color: 'var(--accent-pink)' }}>●</span> post publicado (pulsa el día)</span>
+      </div>
+      <div className="cal-posts">
+        <div className="cal-posts-head">
+          {day ? `${day} de ${monthName.toLowerCase()}` : `Posts de ${monthName.toLowerCase()}`} · {listed.length}
+          {day && <button onClick={() => setDay(null)}>ver todo el mes</button>}
+        </div>
+        {listed.length === 0 && <div className="cal-posts-empty">// sin posts este mes</div>}
+        {listed.map(p => (
+          <div key={p.id} className="search-result" onClick={() => openPost && openPost(p.id)}>
+            <div className="title">{p.title}</div>
+            <div className="meta">{p.date} · {p.category_label || p.category_id}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
 // ── Gallery App ────────────────────────────────────────────────
-function GalleryApp() {
-  const [files, setFiles] = useS([]);
+// Cada imagen abre su propia ventana (id "image-<id>").
+function GalleryApp({ onOpenImage }) {
+  const [files, setFiles] = useS(null);
 
   useEffect(() => {
     fetch('api/media')
       .then(r => r.json())
-      .then(res => { if (res.ok) setFiles(res.data); })
-      .catch(() => {});
+      .then(res => setFiles(res.ok ? res.data : []))
+      .catch(() => setFiles([]));
   }, []);
 
-  const placeholders = [
-    { emoji: '🖼️', label: 'screenshot.png' },
-    { emoji: '📸', label: 'foto.jpg' },
-    { emoji: '🎨', label: 'design.svg' },
-    { emoji: '💻', label: 'terminal.png' },
-    { emoji: '⚡', label: 'bench.png' },
-    { emoji: '🌐', label: 'network.png' },
-    { emoji: '🔧', label: 'config.png' },
-    { emoji: '📡', label: 'signal.png' },
-    { emoji: '🗂️', label: 'files.png' },
-  ];
+  if (files === null) return <div className="gallery"><div className="gallery-empty">cargando…</div></div>;
+  if (files.length === 0) {
+    return (
+      <div className="gallery">
+        <div className="gallery-empty">
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🖼</div>
+          ~/imágenes está vacío
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="gallery">
       <div className="gallery-grid">
-        {files.length > 0
-          ? files.map(f => (
-              <div key={f.id} className="gallery-item">
-                <img src={f.url} alt={f.original_name} />
-              </div>
-            ))
-          : placeholders.map((p, i) => (
-              <div key={i} className="gallery-item">
-                <div className="label">{p.emoji}<br/>{p.label}</div>
-              </div>
-            ))
-        }
+        {files.map(f => (
+          <button key={f.id} className="gallery-item" onClick={() => onOpenImage && onOpenImage(f)} title={f.original_name}>
+            <img src={f.url} alt={f.original_name} loading="lazy" />
+          </button>
+        ))}
       </div>
+    </div>
+  );
+}
+
+// ── Image viewer (ventana por imagen) ──────────────────────────
+function ImageViewerApp({ file }) {
+  return (
+    <div className="img-viewer">
+      <div className="img-viewer-stage"><img src={file.url} alt={file.original_name} /></div>
+      <div className="img-viewer-bar">
+        <span>{file.original_name}</span>
+        {file.width && file.height && <span>{file.width}×{file.height}</span>}
+        <a href={file.url} target="_blank" rel="noopener">abrir original ↗</a>
+      </div>
+    </div>
+  );
+}
+
+// ── Settings App ───────────────────────────────────────────────
+// Lee y escribe los ajustes por contexto: se actualiza al momento aunque la
+// ventana se haya abierto antes del cambio.
+function SettingsApp() {
+  const { tweaks, setTweak } = window.useTweakContext();
+  const Toggle = ({ k, label, hint, def = true }) => {
+    const on = tweaks[k] === undefined ? def : !!tweaks[k];
+    return (
+      <label className="st-toggle">
+        <span><b>{label}</b>{hint && <small>{hint}</small>}</span>
+        <input type="checkbox" role="switch" checked={on} onChange={() => setTweak(k, !on)} />
+        <span className="st-switch" aria-hidden="true" />
+      </label>
+    );
+  };
+  return (
+    <div className="settings-app">
+      <section>
+        <h3>// fondo de pantalla</h3>
+        <div className="st-walls" role="radiogroup" aria-label="Fondo de pantalla">
+          {window.WALLPAPERS.map(w => (
+            <button key={w.id} role="radio" aria-checked={(tweaks.wallpaper || 'neon') === w.id}
+              className={`st-wall${(tweaks.wallpaper || 'neon') === w.id ? ' active' : ''}`}
+              onClick={() => setTweak('wallpaper', w.id)}>
+              <span className={`st-wall-preview wp-${w.id}`} style={w.style} />
+              <span>{w.label}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h3>// color de acento</h3>
+        <div className="st-accents" role="radiogroup" aria-label="Color de acento">
+          {window.ACCENTS.map(a => (
+            <button key={a.id} role="radio" aria-checked={(tweaks.accent || 'neon-green') === a.id}
+              className={`st-accent${(tweaks.accent || 'neon-green') === a.id ? ' active' : ''}`}
+              style={{ '--sw': a.colors[0], '--sw2': a.colors[1] }}
+              onClick={() => setTweak('accent', a.id)} title={a.label}>
+              <span className="st-accent-dot" />
+              <span>{a.label}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h3>// sistema</h3>
+        <Toggle k="soundsOn" label="Sonidos" hint="clic al abrir ventanas" />
+        <Toggle k="showBoot" label="Animación de arranque" hint="log del kernel al entrar" />
+      </section>
     </div>
   );
 }
@@ -553,7 +686,7 @@ function MailApp() {
 }
 
 // ── Terminal App ───────────────────────────────────────────────
-function TerminalApp({ autoFocus = true }) {
+function TerminalApp({ autoFocus = true, openPost }) {
   const posts = window.BLOG_POSTS || [];
   const [lines, setLines] = useS([
     { type: 'output', text: 'jr-os terminal v1.0 — escribe `help` para ver comandos' },
@@ -561,9 +694,36 @@ function TerminalApp({ autoFocus = true }) {
   const [input, setInput] = useS('');
   const [hist,  setHist]  = useS([]);
   const [hIdx,  setHIdx]  = useS(-1);
-  const endRef = useRef(null);
+  const [caret, setCaret] = useS(0);        // posición del cursor de bloque
+  const [focused, setFocused] = useS(false);
+  const endRef   = useRef(null);
+  const inputRef = useRef(null);
+  const moveToEnd = useRef(false);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [lines]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, [lines]);
+
+  // Tras recuperar un comando del historial, el cursor va al final
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    if (moveToEnd.current) { moveToEnd.current = false; el.setSelectionRange(input.length, input.length); }
+    setCaret(el.selectionStart ?? input.length);
+  }, [input]);
+
+  const syncCaret = () => { const el = inputRef.current; if (el) setCaret(el.selectionStart ?? 0); };
+
+  // Clic en cualquier parte de la terminal → escribir en la línea de comandos.
+  // Si el usuario está seleccionando texto (para copiarlo), no se le quita.
+  const focusInput = (e) => {
+    if (e.target === inputRef.current) return;
+    if (String(window.getSelection?.() || '')) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.setSelectionRange(el.value.length, el.value.length);
+    syncCaret();
+    endRef.current?.scrollIntoView({ block: 'nearest' });
+  };
 
   const run = (cmd) => {
     const c = cmd.trim().toLowerCase();
@@ -576,6 +736,7 @@ function TerminalApp({ autoFocus = true }) {
       add('Comandos disponibles:');
       add('  ls          — listar posts');
       add('  cat <id>    — leer un post');
+      if (openPost) add('  open <id>   — abrir un post');
       add('  whoami      — sobre el autor');
       add('  clear       — limpiar terminal');
       add('  uname -a    — info del sistema');
@@ -585,12 +746,19 @@ function TerminalApp({ autoFocus = true }) {
     } else if (c.startsWith('cat ')) {
       const id = c.slice(4).trim();
       const p = posts.find(p => p.id === id);
-      if (p) { add(p.title); add(''); add(p.excerpt || '(sin extracto)'); }
+      if (p) { add(p.title); add(''); add(p.excerpt || '(sin extracto)'); if (openPost) add(`→ open ${p.id} para leerlo entero`); }
       else add(`cat: ${id}: No such file or directory`);
+    } else if (openPost && (c === 'open' || c.startsWith('open '))) {
+      const id = c.slice(5).trim();
+      const p = posts.find(p => p.id === id);
+      if (!id) add('uso: open <id>   (ls para ver los ids)');
+      else if (p) { add(`abriendo ${p.id}…`); openPost(p.id); }
+      else add(`open: ${id}: No such file or directory`);
     } else if (c === 'whoami') {
-      add('jr · J. Roberto M.');
-      add('Sysadmin, programador, entusiasta del hardware retro.');
-      add('jrobertoma.com');
+      const a = window.BLOG_ABOUT || {};
+      add(`jr · ${a.name || 'jr'}`);
+      if (a.role) add(a.role);
+      if (a.subtitle) add(a.subtitle);
     } else if (c === 'uname -a') {
       add('Linux jr-os 6.8.0 #1 SMP x86_64 GNU/Linux — jr-os WM 1.0');
     } else if (c === 'clear') {
@@ -606,24 +774,41 @@ function TerminalApp({ autoFocus = true }) {
   const onKey = (e) => {
     if (e.key === 'Enter') {
       run(input);
-      setHist(h => [input, ...h].slice(0, 50));
+      if (input.trim()) setHist(h => [input, ...h].slice(0, 50));
       setHIdx(-1);
       setInput('');
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      if (!hist.length) return;
       const idx = Math.min(hIdx + 1, hist.length - 1);
       setHIdx(idx);
+      moveToEnd.current = true;
       setInput(hist[idx] || '');
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       const idx = Math.max(hIdx - 1, -1);
       setHIdx(idx);
+      moveToEnd.current = true;
       setInput(idx === -1 ? '' : (hist[idx] || ''));
+    } else if (e.ctrlKey && e.key.toLowerCase() === 'l') {
+      // Ctrl+L limpia la pantalla, como en bash
+      e.preventDefault();
+      setLines([]);
+    } else if (e.ctrlKey && e.key.toLowerCase() === 'c' && !String(window.getSelection?.() || '')) {
+      // Ctrl+C sin texto seleccionado cancela la línea (con selección, copia)
+      e.preventDefault();
+      setLines(l => [...l, { type: 'prompt', text: '$ ' + input + '^C' }]);
+      setInput('');
+      setHIdx(-1);
     }
   };
 
+  const before = input.slice(0, caret);
+  const under  = input.slice(caret, caret + 1) || ' ';
+  const after  = input.slice(caret + 1);
+
   return (
-    <div className="term">
+    <div className="term" onClick={focusInput}>
       {lines.map((l, i) => (
         <div key={i}>
           {l.type === 'prompt'
@@ -635,18 +820,31 @@ function TerminalApp({ autoFocus = true }) {
       <div className="term-input-line">
         <span className="prompt">jr@jr-os</span>
         <span style={{ color: '#555' }}> ~ </span>
-        <input
-          className="term-input"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={onKey}
-          autoFocus={autoFocus}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoCorrect="off"
-          enterKeyHint="send"
-          aria-label="Comando de terminal"
-        />
+        <div className="term-field">
+          {/* Lo que se ve: el texto con un cursor de bloque. El <input> real
+              va encima, transparente, y es el que recibe teclado y clics. */}
+          <span className="term-mirror" aria-hidden="true">
+            {before}<span key={input + caret} className={`term-cursor${focused ? '' : ' idle'}`}>{under}</span>{after}
+          </span>
+          <input
+            ref={inputRef}
+            className="term-input"
+            value={input}
+            onChange={e => { setInput(e.target.value); setCaret(e.target.selectionStart ?? 0); }}
+            onKeyDown={onKey}
+            onKeyUp={syncCaret}
+            onSelect={syncCaret}
+            onFocus={() => { setFocused(true); syncCaret(); }}
+            onBlur={() => setFocused(false)}
+            autoFocus={autoFocus}
+            autoComplete="off"
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            enterKeyHint="send"
+            aria-label="Comando de terminal"
+          />
+        </div>
       </div>
       <div ref={endRef} />
     </div>
@@ -655,41 +853,48 @@ function TerminalApp({ autoFocus = true }) {
 
 // ── About App ──────────────────────────────────────────────────
 function AboutApp() {
+  const a = window.BLOG_ABOUT || {};
+  const stack = a.stack || [];
+  const links = a.links || [];
   return (
     <div className="about">
       <div className="about-hero">
-        <div className="about-avatar">JR</div>
+        <div className="about-avatar">
+          {a.avatar ? <img src={a.avatar} alt={a.name || ''} /> : window.aboutInitials()}
+        </div>
         <div>
-          <h2 className="name">J. Roberto M.</h2>
-          <div className="role">Software dev · Tinkerer · Curioso profesional</div>
-          <div className="domain">jrobertoma.com</div>
+          <h2 className="name">{a.name}</h2>
+          {a.role && <div className="role">{a.role}</div>}
+          {a.subtitle && <div className="domain">{a.subtitle}</div>}
         </div>
       </div>
-      <div className="about-section">
-        <h3>// whoami</h3>
-        <p>Programador, entusiasta del hardware y del open source. Escribo sobre lo que aprendo —software, sistemas, videojuegos y de vez en cuando lo que no entra en ninguna de esas categorías.</p>
-        <p>Este sitio es mi escritorio. Las ventanas se mueven, la terminal funciona, y los posts viven dentro de un explorador. Si te gusta cacharrear con sistemas, probablemente te sientas en casa.</p>
-      </div>
-      <div className="about-section">
-        <h3>// stack</h3>
-        <div className="skill-grid">
-          <div className="skill"><span className="kbd">$</span> rust</div>
-          <div className="skill"><span className="kbd">$</span> typescript</div>
-          <div className="skill"><span className="kbd">$</span> python</div>
-          <div className="skill"><span className="kbd">$</span> linux</div>
-          <div className="skill"><span className="kbd">$</span> docker</div>
-          <div className="skill"><span className="kbd">$</span> postgres</div>
-          <div className="skill"><span className="kbd">$</span> vim</div>
-          <div className="skill"><span className="kbd">$</span> tmux</div>
+      {a.bio && (
+        <div className="about-section">
+          <h3>// whoami</h3>
+          <div className="about-bio" dangerouslySetInnerHTML={{ __html: md(a.bio) }} />
         </div>
-      </div>
-      <div className="about-section">
-        <h3>// contacto</h3>
-        <div className="contact-row"><span className="key">email</span><a href="mailto:hola@jrobertoma.com">hola@jrobertoma.com</a></div>
-        <div className="contact-row"><span className="key">github</span><a href="https://github.com/jrobertoma" target="_blank" rel="noopener noreferrer">@jrobertoma</a></div>
-        <div className="contact-row"><span className="key">mastodon</span><a href="https://hachyderm.io/@jrobertoma" target="_blank" rel="me noopener noreferrer">@jrobertoma@hachyderm.io</a></div>
-        <div className="contact-row"><span className="key">rss</span><span>jrobertoma.com/feed.xml</span></div>
-      </div>
+      )}
+      {stack.length > 0 && (
+        <div className="about-section">
+          <h3>// stack</h3>
+          <div className="skill-grid">
+            {stack.map(s => <div key={s} className="skill"><span className="kbd">$</span> {s}</div>)}
+          </div>
+        </div>
+      )}
+      {links.length > 0 && (
+        <div className="about-section">
+          <h3>// contacto</h3>
+          {links.map((l, i) => (
+            <div key={i} className="contact-row">
+              <span className="key">{l.label}</span>
+              {l.url
+                ? <a href={l.url} {...(/^https?:/i.test(l.url) ? { target: '_blank', rel: 'me noopener noreferrer' } : {})}>{l.text}</a>
+                : <span>{l.text}</span>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -706,6 +911,8 @@ window.SearchApp   = SearchApp;
 window.CalendarApp = CalendarApp;
 window.GalleryApp  = GalleryApp;
 window.MailApp     = MailApp;
+window.ImageViewerApp = ImageViewerApp;
+window.SettingsApp = SettingsApp;
 window.TerminalApp = TerminalApp;
 window.AboutApp    = AboutApp;
 })();

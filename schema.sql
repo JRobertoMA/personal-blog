@@ -85,6 +85,15 @@ CREATE TABLE IF NOT EXISTS media (
   uploaded_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
+-- Ajustes clave/valor. value es TEXT: máximo 65 535 BYTES por valor (un emoji
+-- ocupa 4); la API lo comprueba antes de guardar (fitsSettingsValue()).
+-- Claves en uso:
+--   site_*, social_*, comments_enabled, rss_enabled, analytics_enabled, webhook_url
+--                → panel › Configuración
+--   about_page   → JSON de la página «Sobre mí» (panel › Sobre mí, api/handlers/about.php)
+--   notes_page   → texto de la ventana «Notas» (panel › Notas, api/handlers/notes.php)
+-- about_page y notes_page no se siembran: se crean al guardar desde el panel y,
+-- mientras no existen, la API devuelve el contenido por defecto definido en PHP.
 CREATE TABLE IF NOT EXISTS settings (
   key_name   VARCHAR(100) PRIMARY KEY,
   value      TEXT,
@@ -173,9 +182,6 @@ INSERT IGNORE INTO posts (id, title, excerpt, body, category_id, status, date) V
 
 -- ─── Default settings ─────────────────────────────────────────────
 INSERT IGNORE INTO settings (key_name, value) VALUES
-  ('profile_name',        'J. Roberto M.'),
-  ('profile_email',       'jroberto.ma@outlook.com'),
-  ('profile_bio',         'Sysadmin, programador y entusiasta del hardware retro.'),
   ('site_title',          'jrobertoma.com'),
   ('site_description',    'Un blog que se siente como un sistema operativo.'),
   ('site_domain',         'jrobertoma.com'),

@@ -153,9 +153,11 @@ function HomeScreen({ cat }) {
       <main className="m-main" id="contenido">
         {cat === 'all' && (
           <section className="m-hero">
-            <div className="m-avatar" aria-hidden="true">JR</div>
+            <div className="m-avatar" aria-hidden="true">
+              {window.BLOG_ABOUT?.avatar ? <img src={window.BLOG_ABOUT.avatar} alt="" /> : window.aboutInitials()}
+            </div>
             <div>
-              <div className="m-hero-name">J. Roberto M.</div>
+              <div className="m-hero-name">{window.BLOG_ABOUT?.name}</div>
               <div className="m-hero-tag">software · hardware · linux · etc</div>
             </div>
           </section>
@@ -262,13 +264,13 @@ function PostScreen({ id }) {
               : <div className="m-prose" dangerouslySetInnerHTML={{ __html: window.renderMarkdown(post.body) }} />}
 
             <div className="m-article-end">
-              <span>— Gracias por leer. JR</span>
+              <span>— Gracias por leer. {window.aboutInitials()}</span>
               <button className="m-btn ghost" onClick={share}><Icon d={I.share} size={16} /> Compartir</button>
             </div>
 
             <section className="m-comments">
               {showComments
-                ? <window.CommentsApp postId={id} />
+                ? <window.CommentsApp postId={id} showPostTitle={false} />
                 : <button className="m-btn block" onClick={() => setShowComments(true)}>
                     <Icon d={I.chat} size={18} /> Ver comentarios{Number(post.comment_count) > 0 ? ` (${post.comment_count})` : ''} y opinar
                   </button>}
@@ -356,7 +358,7 @@ function SearchScreen({ initial }) {
 
 // ── Sobre mí (+ personalización y terminal) ───────────────────
 function AboutScreen({ tweaks, setTweak }) {
-  const accents = [['neon-green', '#39ff14', 'Verde'], ['cyan', '#00f0ff', 'Cian'], ['magenta', '#ff00d4', 'Magenta'], ['amber', '#ffb800', 'Ámbar']];
+  const accents = window.ACCENTS.map(a => [a.id, a.colors[0], a.label]);
   return (
     <>
       <TopBar title="Sobre mí" />
@@ -393,7 +395,7 @@ function TerminalScreen() {
   return (
     <>
       <TopBar title="Terminal" onBack={() => (history.length > 1 ? history.back() : go('sobre-mi'))} />
-      <main className="m-main m-embed m-term" id="contenido"><window.TerminalApp autoFocus={false} /></main>
+      <main className="m-main m-embed m-term" id="contenido"><window.TerminalApp autoFocus={false} openPost={(id) => go("post/" + encodeURIComponent(id))} /></main>
     </>
   );
 }

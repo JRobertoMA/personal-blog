@@ -9,3 +9,4 @@ Frontend React (compilado con esbuild) + API PHP/MariaDB, pensado para hosting c
 - `schema.sql` — estructura y datos de ejemplo.
 - `docs/ANALISIS.md` — análisis de seguridad, UX y UI.
 - `docs/DESPLIEGUE.md` — guía para subirlo a IONOS.
+- `docs/CLOUDFLARE.md` — HTTPS con Cloudflare delante de IONOS (modo Flexible, regla y Access).

@@ -1,6 +1,6 @@
 // ─── Desktop Component ─────────────────────────────────────────
 (function() {
-const { useState: useS, useEffect, useRef, useCallback } = React;
+const { useState: useS, useEffect, useRef, useCallback, useMemo } = React;
 
 const APPS = [
   { id: 'about',    title: 'Acerca de mí',     icon: '👤', w: 520, h: 580, desktop: true  },
@@ -13,8 +13,7 @@ const APPS = [
   { id: 'tags',     title: 'Tags & Categorías', icon: '🏷️', w: 540, h: 520, desktop: false },
   { id: 'calendar', title: 'Calendario',        icon: '🗓',  w: 520, h: 480, desktop: false },
   { id: 'gallery',  title: 'Galería',           icon: '🖼',  w: 560, h: 480, desktop: false },
-  { id: 'comments', title: 'Comentarios',       icon: '💬', w: 520, h: 440, desktop: false },
-  { id: 'settings', title: 'Ajustes',           icon: '⚙️', w: 340, h: 380, desktop: false },
+  { id: 'settings', title: 'Ajustes',           icon: '⚙️', w: 420, h: 500, desktop: false },
 ];
 
 // ─── Boot screen (kernel log style) ──────────────────────────
@@ -74,11 +73,12 @@ function Desktop({ tweaks, setTweak }) {
   const [booted,     setBooted]  = useS(!tweaks.showBoot || !!sharedPostId);
   const [menuOpen,   setMenu]    = useS(false);
   const [menuQuery,  setMQ]      = useS('');
-  const [commentsPostId, setCommentsPostId] = useS(null);
   const [ctxMenu,    setCtxMenu] = useS(null);
-  const [soundOn,    setSoundOn] = useS(tweaks.soundsOn !== false);
+  const soundOn = tweaks.soundsOn !== false;   // se guarda con el resto de ajustes
   const audioCtxRef = useRef(null);
-  const openAppRef  = useRef(null);
+  // Lista de ventanas siempre actual, para funciones que viven dentro de ventanas ya abiertas
+  const windowsRef = useRef(wm.windows);
+  windowsRef.current = wm.windows;
 
   // Click sound
   const click = useCallback(() => {
@@ -95,18 +95,43 @@ function Desktop({ tweaks, setTweak }) {
     } catch(e) {}
   }, [soundOn]);
 
-  // Wallpaper variant inline style
-  const wallVar = tweaks.wallpaper === 'matrix' ? {
-    backgroundImage: 'radial-gradient(ellipse at 50% 50%, rgba(57,255,20,0.15), transparent 60%), linear-gradient(180deg, #000, #050605)'
-  } : tweaks.wallpaper === 'sunset' ? {
-    backgroundImage: 'radial-gradient(ellipse at 50% 80%, rgba(255,100,80,0.25), transparent 60%), radial-gradient(ellipse at 50% 30%, rgba(120,40,180,0.2), transparent 60%), linear-gradient(180deg, #1a0820, #0a0410)'
-  } : {};
+  const wallVar = window.wallpaperStyle(tweaks.wallpaper);
+
+  // Comentarios: una ventana por post (id "comments-<post>"), nunca una general.
+  // Se abre desde el botón "Comentarios (N)" de cada post, no desde el menú inicio.
+  const openComments = useCallback((postId) => {
+    const post = (window.BLOG_POSTS || []).find(p => p.id === postId);
+    if (!post) return;
+    click();
+    wm.openWindow({
+      id: `comments-${postId}`,
+      title: `Comentarios · ${post.title}`,
+      icon: '💬',
+      content: <window.CommentsApp postId={postId} />,
+      width: 520, height: 480,
+    });
+  }, [wm, click]);
+
+  // Galería: una ventana por imagen (id "image-<id>")
+  const openImage = useCallback((file) => {
+    if (!file) return;
+    click();
+    wm.openWindow({
+      id: `image-${file.id}`,
+      title: file.original_name || 'Imagen',
+      icon: '🖼',
+      content: <window.ImageViewerApp file={file} />,
+      width: Math.min(900, Math.max(360, (file.width || 640) + 40)),
+      height: Math.min(700, Math.max(300, (file.height || 480) + 90)),
+    });
+  }, [wm, click]);
 
   const openPost = useCallback((postId) => {
     const winId = `post-${postId}`;
-    const existing = wm.windows.find(w => w.id === winId);
+    const windows  = windowsRef.current;
+    const existing = windows.find(w => w.id === winId);
     if (existing) { wm.focusWindow(winId); return; }
-    const postCount = wm.windows.filter(w => w.id.startsWith('post-')).length;
+    const postCount = windows.filter(w => w.id.startsWith('post-')).length;
     if (postCount >= MAX_POST_WINDOWS) return;
     const post = (window.BLOG_POSTS || []).find(p => p.id === postId);
     if (!post) return;
@@ -115,10 +140,10 @@ function Desktop({ tweaks, setTweak }) {
       id: winId,
       title: post.title,
       icon: '📄',
-      content: <window.PostApp postId={postId} onOpenComments={(pid) => { setCommentsPostId(pid); openAppRef.current?.('comments'); }} />,
+      content: <window.PostApp postId={postId} onOpenComments={act.openComments} />,
       width: 640, height: 480,
     });
-  }, [wm, click]);
+  }, [wm, click, openComments]);
 
   const openApp = useCallback((appId) => {
     const app = APPS.find(a => a.id === appId);
@@ -127,22 +152,32 @@ function Desktop({ tweaks, setTweak }) {
     setMenu(false);
 
     let content;
-    if      (appId === 'reader')   content = <window.ReaderApp onOpenComments={(pid) => { setCommentsPostId(pid); openAppRef.current?.('comments'); }} />;
-    else if (appId === 'comments') content = <window.CommentsApp postId={commentsPostId} />;
-    else if (appId === 'files')    content = <window.FilesApp onOpenPost={openPost} />;
+    // Las ventanas guardan su contenido al abrirse: se les pasan las funciones
+    // estables de `act`, que siempre llaman a la versión actual.
+    if      (appId === 'reader')   content = <window.ReaderApp onOpenComments={act.openComments} />;
+    else if (appId === 'files')    content = <window.FilesApp onOpenPost={act.openPost} onOpenApp={act.openApp} />;
     else if (appId === 'notes')    content = <window.NotesApp />;
-    else if (appId === 'tags')     content = <window.TagsApp openPost={openPost} />;
-    else if (appId === 'search')   content = <window.SearchApp openPost={openPost} />;
-    else if (appId === 'calendar') content = <window.CalendarApp />;
-    else if (appId === 'gallery')  content = <window.GalleryApp />;
-    else if (appId === 'terminal') content = <window.TerminalApp />;
+    else if (appId === 'tags')     content = <window.TagsApp openPost={act.openPost} />;
+    else if (appId === 'search')   content = <window.SearchApp openPost={act.openPost} />;
+    else if (appId === 'calendar') content = <window.CalendarApp openPost={act.openPost} />;
+    else if (appId === 'gallery')  content = <window.GalleryApp onOpenImage={act.openImage} />;
+    else if (appId === 'terminal') content = <window.TerminalApp openPost={act.openPost} />;
+    else if (appId === 'settings') content = <window.SettingsApp />;
     else if (appId === 'mail')     content = <window.MailApp />;
     else if (appId === 'about')    content = <window.AboutApp />;
 
     wm.openWindow({ id: appId, title: app.title, icon: app.icon, content, width: app.w, height: app.h });
-  }, [wm, click, commentsPostId, openPost]);
+  }, [wm, click]);
 
-  openAppRef.current = openApp;
+  // Funciones estables para el contenido de las ventanas (evita closures congelados)
+  const latest = useRef({});
+  latest.current = { openPost, openComments, openApp, openImage };
+  const act = useMemo(() => ({
+    openPost:     (id)   => latest.current.openPost(id),
+    openComments: (id)   => latest.current.openComments(id),
+    openApp:      (id)   => latest.current.openApp(id),
+    openImage:    (file) => latest.current.openImage(file),
+  }), []);
 
   // Al arrancar: abre el post enlazado o, si no hay, "Acerca de mí"
   useEffect(() => {
@@ -208,7 +243,7 @@ function Desktop({ tweaks, setTweak }) {
       {menuOpen && (
         <div className="start-menu" onClick={e => e.stopPropagation()}>
           <div className="sm-header">
-            <div className="sm-avatar">JR</div>
+            <div className="sm-avatar">{window.aboutInitials()}</div>
             <div className="sm-user">
               <div className="name">jr@jrobertoma.com</div>
               <div className="domain">// session active</div>
@@ -280,7 +315,7 @@ function Desktop({ tweaks, setTweak }) {
         </div>
         <div className="tb-systray">
           <span className="sysicon" title="wifi">⌬</span>
-          <span className="sysicon" title="sonido" onClick={e => { e.stopPropagation(); setSoundOn(s => !s); }}>
+          <span className="sysicon" title={soundOn ? 'Silenciar' : 'Activar sonido'} onClick={e => { e.stopPropagation(); setTweak('soundsOn', !soundOn); }}>
             {soundOn ? '🔊' : '🔇'}
           </span>
           <Clock />
@@ -302,11 +337,15 @@ function MatrixRain() {
     const cols  = Math.floor(canvas.width / 14);
     const drops = Array(cols).fill(1);
     const chars = 'ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃ01ABCDEF';
-    let raf;
+    let raf, frame = 0;
+    // Color del acento actual (se relee cada ~medio segundo por si cambia)
+    const accent = () => getComputedStyle(document.documentElement).getPropertyValue('--neon').trim() || '#39ff14';
+    let color = accent();
     const draw = () => {
+      if (++frame % 30 === 0) color = accent();
       ctx.fillStyle = 'rgba(0,0,0,0.05)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#39ff14';
+      ctx.fillStyle = color;
       ctx.font = '13px monospace';
       drops.forEach((y, i) => {
         const c = chars[Math.floor(Math.random() * chars.length)];

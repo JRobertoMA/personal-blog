@@ -3,7 +3,9 @@ Options -Indexes
 DirectoryIndex index.html
 RewriteEngine On
 
-# ─── Forzar HTTPS (activa el certificado SSL en el panel de IONOS primero) ───
+# ─── Forzar HTTPS (el certificado lo pone Cloudflare, ver docs/CLOUDFLARE.md) ───
+# No se aplica en local (localhost / IPs privadas), donde no hay certificado.
+RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$ [NC]
 RewriteCond %{HTTPS} !=on
 RewriteCond %{HTTP:X-Forwarded-Proto} !=https
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]

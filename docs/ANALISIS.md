@@ -43,11 +43,12 @@ Cada hallazgo indica su **gravedad** y si **ya está corregido** en este reposit
 
 ### Pendiente / recomendaciones (no automatizables desde el código)
 
-1. Activa el **certificado SSL** del dominio en IONOS y, cuando todo funcione por HTTPS, descomenta la línea HSTS del `.htaccess`.
-2. Sube el `.env` **fuera** de la carpeta del dominio (IONOS permite que el dominio apunte a una subcarpeta, p. ej. `/blog`; deja el `.env` en `/`). `api/config/database.php` lo busca hasta 2 niveles por encima de la raíz del proyecto.
-3. Usa una contraseña de administrador larga (≥ 16 caracteres) y un nombre de usuario distinto de `admin`.
-4. Haz copias de seguridad periódicas de la BD desde el panel de IONOS.
-5. Si en el futuro activas `webhook_url`, valida en el servidor que sea `https://` para evitar SSRF.
+1. SSL: resuelto con Cloudflare en modo Flexible (ver [CLOUDFLARE.md](CLOUDFLARE.md)). Cuando todo lleve un tiempo funcionando por HTTPS, descomenta la línea HSTS del `.htaccess`.
+2. Con el proxy de Cloudflare, `clientIp()` debe usar `CF-Connecting-IP` (validando que la petición viene de Cloudflare) para que los límites por IP vean al visitante real.
+3. Sube el `.env` **fuera** de la carpeta del dominio (IONOS permite que el dominio apunte a una subcarpeta, p. ej. `/blog`; deja el `.env` en `/`). `api/config/database.php` lo busca hasta 2 niveles por encima de la raíz del proyecto.
+4. Usa una contraseña de administrador larga (≥ 16 caracteres) y un nombre de usuario distinto de `admin`.
+5. Haz copias de seguridad periódicas de la BD desde el panel de IONOS.
+6. Si en el futuro activas `webhook_url`, valida en el servidor que sea `https://` para evitar SSRF.
 
 ---
 

@@ -71,6 +71,32 @@ function TweakToggle({ label, value, onChange }) {
   );
 }
 
+// Ajustes en vivo para cualquier componente. Las ventanas del escritorio
+// guardan su contenido al abrirse, así que no pueden recibirlos por props.
+const TweaksContext = React.createContext({ tweaks: {}, setTweak: () => {} });
+const useTweakContext = () => React.useContext(TweaksContext);
+
+// Fondos de escritorio (los usa el escritorio y las miniaturas de Ajustes)
+const WALLPAPERS = [
+  { id: 'neon',   label: 'Neón',   style: {} },
+  { id: 'matrix', label: 'Matrix', style: { backgroundImage: 'radial-gradient(ellipse at 50% 50%, rgba(var(--neon-rgb),0.15), transparent 60%), linear-gradient(180deg, #000, #050605)' } },
+  { id: 'sunset', label: 'Sunset', style: { backgroundImage: 'radial-gradient(ellipse at 50% 80%, rgba(255,100,80,0.25), transparent 60%), radial-gradient(ellipse at 50% 30%, rgba(120,40,180,0.2), transparent 60%), linear-gradient(180deg, #1a0820, #0a0410)' } },
+];
+const wallpaperStyle = (id) => (WALLPAPERS.find(w => w.id === id) || WALLPAPERS[0]).style;
+
+// Colores de acento: [neón principal, neón secundario]
+const ACCENTS = [
+  { id: 'neon-green', label: 'Verde',   colors: ['#39ff14', '#00f0ff'] },
+  { id: 'cyan',       label: 'Cian',    colors: ['#00f0ff', '#39ff14'] },
+  { id: 'magenta',    label: 'Magenta', colors: ['#ff00d4', '#00f0ff'] },
+  { id: 'amber',      label: 'Ámbar',   colors: ['#ffb800', '#ff00d4'] },
+];
+
+window.TweaksContext   = TweaksContext;
+window.useTweakContext = useTweakContext;
+window.WALLPAPERS      = WALLPAPERS;
+window.wallpaperStyle  = wallpaperStyle;
+window.ACCENTS         = ACCENTS;
 window.useTweaks    = useTweaks;
 window.TweaksPanel  = TweaksPanel;
 window.TweakSection = TweakSection;

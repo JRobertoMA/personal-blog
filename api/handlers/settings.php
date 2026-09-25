@@ -27,6 +27,7 @@ if ($method === 'PATCH') {
     foreach ($keys as $key) {
         if (array_key_exists($key, $body)) {
             $val = is_bool($body[$key]) ? (int)$body[$key] : (string)$body[$key];
+            if (!fitsSettingsValue((string)$val)) respond(false, "El valor de «{$key}» es demasiado largo", 400);
             $stmt->execute([$key, $val, $val]);
         }
     }

@@ -81,6 +81,8 @@ switch ($resource) {
     case 'analytics':   require __DIR__ . '/handlers/analytics.php';  break;
     case 'settings':    require __DIR__ . '/handlers/settings.php';   break;
     case 'auth':        require __DIR__ . '/handlers/auth.php';       break;
+    case 'about':       require __DIR__ . '/handlers/about.php';      break;
+    case 'notes':       require __DIR__ . '/handlers/notes.php';      break;
     default:
         respond(false, 'Ruta no encontrada', 404);
 }

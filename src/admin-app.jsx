@@ -554,13 +554,12 @@ function Analytics() {
 
 // ── Settings ───────────────────────────────────────────────────
 function Settings() {
-  const [active, setActive] = useState('profile');
+  const [active, setActive] = useState('site');
   const [vals, setVals] = useState({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const GROUPS = [
-    { id:'profile',  label:'Perfil' },
     { id:'site',     label:'Sitio' },
     { id:'social',   label:'Social' },
     { id:'comments', label:'Comentarios' },
@@ -568,7 +567,6 @@ function Settings() {
   ];
 
   const FIELDS = {
-    profile:  [['profile_name','Nombre'],['profile_email','Email'],['profile_bio','Bio']],
     site:     [['site_title','Título'],['site_description','Descripción'],['site_domain','Dominio'],['site_posts_per_page','Posts por página']],
     social:   [['social_github','GitHub'],['social_mastodon','Mastodon'],['social_rss','RSS'],['social_email','Email público']],
     comments: [['comments_enabled','Comentarios habilitados'],['rss_enabled','RSS habilitado']],
@@ -613,12 +611,267 @@ function Settings() {
   );
 }
 
+// ── Sobre mí ───────────────────────────────────────────────────
+const EMPTY_LINK = { label: '', text: '', url: '' };
+const withEmptyLink = (links) => (links && links.length ? links : [{ ...EMPTY_LINK }]);
+const initialsOf = (name) => (name || '').split(/\s+/).filter(w => /^\p{L}/u.test(w)).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+function AboutEditor() {
+  const [form, setForm]         = useState(null);
+  const [stackText, setStack]   = useState('');
+  const [savedSnap, setSnap]    = useState('');
+  const [media, setMedia]       = useState([]);
+  const [tab, setTab]           = useState('edit');
+  const [saving, setSaving]     = useState(false);
+  const [msg, setMsg]           = useState(null); // { type: 'ok' | 'error', text }
+
+  const load = (data) => {
+    const f = { ...data, links: withEmptyLink(data.links) };
+    const st = (data.stack || []).join(', ');
+    setForm(f); setStack(st); setSnap(JSON.stringify([f, st]));
+  };
+
+  useEffect(() => {
+    api('/about').then(r => (r.ok ? load(r.data) : setMsg({ type: 'error', text: r.error || 'No se pudo cargar' })))
+      .catch(() => setMsg({ type: 'error', text: 'No se pudo cargar' }));
+    api('/media').then(r => { if (r.ok) setMedia(r.data || []); }).catch(() => {});
+  }, []);
+
+  if (!form) return <div className="page-sub">{msg?.text || 'Cargando…'}</div>;
+
+  const dirty = JSON.stringify([form, stackText]) !== savedSnap;
+  const stack = stackText.split(',').map(x => x.trim()).filter(Boolean);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const setLink = (i, k, v) => setForm(f => ({ ...f, links: f.links.map((l, j) => (j === i ? { ...l, [k]: v } : l)) }));
+  const addLink = () => setForm(f => ({ ...f, links: [...f.links, { ...EMPTY_LINK }] }));
+  const removeLink = (i) => setForm(f => ({ ...f, links: withEmptyLink(f.links.filter((_, j) => j !== i)) }));
+  const moveLink = (i, d) => setForm(f => {
+    const links = [...f.links], j = i + d;
+    if (j < 0 || j >= links.length) return f;
+    [links[i], links[j]] = [links[j], links[i]];
+    return { ...f, links };
+  });
+
+  const save = async () => {
+    setSaving(true); setMsg(null);
+    try {
+      const res = await api('/about', { method: 'PUT', body: JSON.stringify({ ...form, stack }) });
+      if (res.ok) {
+        load(res.data);
+        setMsg({ type: 'ok', text: '✓ Guardado' });
+        setTimeout(() => setMsg(m => (m?.type === 'ok' ? null : m)), 2500);
+      } else {
+        setMsg({ type: 'error', text: res.error || 'Error al guardar' });
+      }
+    } catch (e) {
+      setMsg({ type: 'error', text: 'No se pudo conectar con el servidor' });
+    }
+    setSaving(false);
+  };
+
+  const images = media.filter(m => /^image\//.test(m.mime_type || 'image/'));
+  const autoInitials = initialsOf(form.name);
+
+  return (
+    <>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Sobre mí</h1>
+          <div className="page-sub">Se muestra en «Acerca de mí» (escritorio), la pestaña «Sobre mí» (móvil) y el <code>whoami</code> de la terminal.</div>
+        </div>
+        <div className="page-actions">
+          {dirty && !saving && <span className="about-dirty">Cambios sin guardar</span>}
+          <a className="btn" href="index.html#/sobre-mi" target="_blank" rel="noopener">Ver en el sitio ↗</a>
+          <button className="btn primary" onClick={save} disabled={saving || !dirty}>{saving ? 'Guardando…' : 'Guardar'}</button>
+        </div>
+      </div>
+      {msg && <div className={`about-msg ${msg.type}`} role="status">{msg.text}</div>}
+
+      <div className="about-layout">
+        <div>
+          <div className="card about-card">
+            <div className="about-card-title">Identidad</div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label" htmlFor="ab-name">Nombre</label>
+                <input id="ab-name" className="form-input" value={form.name} maxLength={120} onChange={e => set('name', e.target.value)} placeholder="Tu nombre" />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="ab-initials">Iniciales</label>
+                <input id="ab-initials" className="form-input" value={form.initials} maxLength={3} onChange={e => set('initials', e.target.value.toUpperCase())} placeholder={autoInitials || 'JR'} />
+                <div className="form-hint">Avatar sin foto y firma de los posts. Vacío = automáticas.</div>
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="ab-role">Rol</label>
+              <input id="ab-role" className="form-input" value={form.role} maxLength={200} onChange={e => set('role', e.target.value)} placeholder="Software dev · Tinkerer" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" htmlFor="ab-sub">Subtítulo</label>
+              <input id="ab-sub" className="form-input" value={form.subtitle} maxLength={120} onChange={e => set('subtitle', e.target.value)} placeholder="jrobertoma.com" />
+              <div className="form-hint">Línea pequeña bajo el rol.</div>
+            </div>
+          </div>
+
+          <div className="card about-card">
+            <div className="about-card-title">Bio <span>// whoami · Markdown</span></div>
+            <div className="tabs">
+              <div className={`tab${tab === 'edit' ? ' active' : ''}`} onClick={() => setTab('edit')}>Editar</div>
+              <div className={`tab${tab === 'preview' ? ' active' : ''}`} onClick={() => setTab('preview')}>Preview</div>
+            </div>
+            {tab === 'edit'
+              ? <textarea className="form-input form-textarea" style={{ height: 220 }} value={form.bio} maxLength={10000} onChange={e => set('bio', e.target.value)} placeholder="Cuéntale al lector quién eres… (deja una línea en blanco entre párrafos)" />
+              : <div className="md-preview" dangerouslySetInnerHTML={{ __html: renderMd(form.bio) }} />}
+          </div>
+
+          <div className="card about-card">
+            <div className="about-card-title">Contacto <span>// enlaces</span></div>
+            <div className="about-links-head"><span>Etiqueta</span><span>Texto visible</span><span>URL (opcional)</span><span /></div>
+            {form.links.map((l, i) => (
+              <div key={i} className="about-link-row">
+                <input className="form-input" value={l.label} maxLength={30} onChange={e => setLink(i, 'label', e.target.value)} placeholder="github" aria-label={`Etiqueta del contacto ${i + 1}`} />
+                <input className="form-input" value={l.text} maxLength={120} onChange={e => setLink(i, 'text', e.target.value)} placeholder="@usuario" aria-label={`Texto del contacto ${i + 1}`} />
+                <input className="form-input" value={l.url} maxLength={300} onChange={e => setLink(i, 'url', e.target.value)} placeholder="https://… o mailto:…" aria-label={`URL del contacto ${i + 1}`} />
+                <div className="about-link-actions">
+                  <button className="btn sm" onClick={() => moveLink(i, -1)} disabled={i === 0} title="Subir" aria-label="Subir">↑</button>
+                  <button className="btn sm" onClick={() => moveLink(i, 1)} disabled={i === form.links.length - 1} title="Bajar" aria-label="Bajar">↓</button>
+                  <button className="btn sm" onClick={() => removeLink(i)} title="Quitar" aria-label="Quitar">✕</button>
+                </div>
+              </div>
+            ))}
+            <button className="btn sm" onClick={addLink} disabled={form.links.length >= 12} style={{ marginTop: 4 }}>+ Añadir contacto</button>
+            <div className="form-hint">Sin URL se muestra como texto. Solo se admiten enlaces <code>https://</code> y <code>mailto:</code>.</div>
+          </div>
+        </div>
+
+        <div>
+          <div className="card about-card">
+            <div className="about-card-title">Foto</div>
+            <div className="about-avatar-preview">
+              {form.avatar ? <img src={form.avatar} alt="" /> : (form.initials || autoInitials || 'JR')}
+            </div>
+            {images.length > 0 ? (
+              <>
+                <div className="about-avatar-grid">
+                  {images.map(m => (
+                    <button key={m.id} className={`about-avatar-opt${form.avatar === m.url ? ' active' : ''}`} onClick={() => set('avatar', m.url)} title={m.original_name}>
+                      <img src={m.url} alt={m.original_name} loading="lazy" />
+                    </button>
+                  ))}
+                </div>
+                {form.avatar && <button className="btn sm" onClick={() => set('avatar', '')} style={{ marginTop: 10 }}>Quitar foto (usar iniciales)</button>}
+              </>
+            ) : (
+              <div className="form-hint">Sube una imagen en <b>Multimedia</b> para usarla como foto.</div>
+            )}
+          </div>
+
+          <div className="card about-card">
+            <div className="about-card-title">Stack <span>// tecnologías</span></div>
+            <textarea className="form-input" style={{ minHeight: 70, resize: 'vertical' }} value={stackText} onChange={e => setStack(e.target.value)} placeholder="rust, python, linux, docker" aria-label="Stack, separado por comas" />
+            <div className="form-hint">Separadas por comas · {stack.length}/40</div>
+            {stack.length > 0 && <div className="about-chips">{stack.map((x, i) => <span key={i}>$ {x}</span>)}</div>}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Notas ──────────────────────────────────────────────────────
+const NOTES_MAX = 20000;
+const NOTES_MAX_BYTES = 65535; // límite de settings.value (TEXT) en la base de datos
+
+function NotesEditor() {
+  const [text, setText]     = useState(null);
+  const [saved, setSaved]   = useState('');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg]       = useState(null); // { type: 'ok' | 'error', text }
+
+  useEffect(() => {
+    api('/notes').then(r => {
+      if (r.ok) { setText(r.data.text); setSaved(r.data.text); }
+      else setMsg({ type: 'error', text: r.error || 'No se pudo cargar' });
+    }).catch(() => setMsg({ type: 'error', text: 'No se pudo cargar' }));
+  }, []);
+
+  if (text === null) return <div className="page-sub">{msg?.text || 'Cargando…'}</div>;
+
+  const dirty = text !== saved;
+  const lines = window.parseNotes(text);
+  const bytes = new TextEncoder().encode(text).length;
+  const tooBig = bytes > NOTES_MAX_BYTES;
+
+  const save = async () => {
+    setSaving(true); setMsg(null);
+    try {
+      const res = await api('/notes', { method: 'PUT', body: JSON.stringify({ text }) });
+      if (res.ok) {
+        setText(res.data.text); setSaved(res.data.text);
+        setMsg({ type: 'ok', text: '✓ Guardado' });
+        setTimeout(() => setMsg(m => (m?.type === 'ok' ? null : m)), 2500);
+      } else {
+        setMsg({ type: 'error', text: res.error || 'Error al guardar' });
+      }
+    } catch (e) {
+      setMsg({ type: 'error', text: 'No se pudo conectar con el servidor' });
+    }
+    setSaving(false);
+  };
+
+  return (
+    <>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Notas</h1>
+          <div className="page-sub">La ventana «Notas» del escritorio. Es pública: no escribas nada privado.</div>
+        </div>
+        <div className="page-actions">
+          {dirty && !saving && <span className="about-dirty">Cambios sin guardar</span>}
+          <a className="btn" href="index.html" target="_blank" rel="noopener">Ver en el sitio ↗</a>
+          <button className="btn primary" onClick={save} disabled={saving || !dirty || tooBig}>{saving ? 'Guardando…' : 'Guardar'}</button>
+        </div>
+      </div>
+      {msg && <div className={`about-msg ${msg.type}`} role="status">{msg.text}</div>}
+
+      <div className="card notes-help">
+        <span><code># título</code> encabezado ★</span>
+        <span><code>- texto</code> elemento</span>
+        <span><code>&gt; texto</code> anotación a mano</span>
+        <span><code>{'{hoy}'}</code> fecha del día</span>
+        <span>línea vacía = espacio</span>
+      </div>
+
+      <div className="notes-layout">
+        <div>
+          <textarea className="form-input form-textarea notes-textarea" value={text} maxLength={NOTES_MAX}
+            onChange={e => setText(e.target.value)} spellCheck={false} aria-label="Texto de las notas"
+            placeholder={'# NOTAS PERSONALES — {hoy}\n\n- una tarea\n> (una anotación)'} />
+          <div className="form-hint" style={tooBig ? { color: 'var(--danger)' } : undefined}>
+            {text.length.toLocaleString('es-ES')} / {NOTES_MAX.toLocaleString('es-ES')} caracteres
+            {bytes > NOTES_MAX_BYTES * 0.8 && <> · {Math.round(bytes / 1024)} KB de 64 KB{tooBig ? ' — demasiado largo para guardar (los emojis ocupan 4 veces más)' : ''}</>}
+          </div>
+        </div>
+        <div className="notes-preview" aria-label="Vista previa">
+          {lines.map((l, i) => (
+            <div key={i} className={l.type === 'star' ? 'star' : l.type === 'scribble' ? 'scribble' : undefined}>
+              {l.type === 'blank' ? ' ' : window.NOTE_PREFIX[l.type] + l.text}
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Shell ──────────────────────────────────────────────────────
 const NAV = [
   { id:'dashboard', label:'Dashboard', ico:'📊', section:'contenido' },
   { id:'posts',     label:'Posts',     ico:'📝', section:'contenido' },
   { id:'tags',      label:'Categorías/Tags', ico:'🏷️', section:'contenido' },
   { id:'media',     label:'Multimedia', ico:'🖼️', section:'contenido' },
+  { id:'about',     label:'Sobre mí',   ico:'👤', section:'contenido' },
+  { id:'notes',     label:'Notas',      ico:'🗒️', section:'contenido' },
   { id:'comments',  label:'Comentarios', ico:'💬', section:'interaccion' },
   { id:'messages',  label:'Mensajes',  ico:'✉️', section:'interaccion' },
   { id:'analytics', label:'Analytics', ico:'📈', section:'sistema' },
@@ -659,6 +912,8 @@ function AdminShell({ username, onLogout }) {
   else if (view === 'posts')     content = <PostsList onEdit={goEdit} onNew={goNew} />;
   else if (view === 'tags')      content = <TagsManager />;
   else if (view === 'media')     content = <Media />;
+  else if (view === 'about')     content = <AboutEditor />;
+  else if (view === 'notes')     content = <NotesEditor />;
   else if (view === 'comments')  content = <Comments />;
   else if (view === 'messages')  content = <Messages />;
   else if (view === 'analytics') content = <Analytics />;

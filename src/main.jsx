@@ -2,6 +2,7 @@
 // cada archivo registra sus componentes en window.*
 import './globals.js';
 import './markdown.js';
+import './notes.js';
 import './tweaks-panel.jsx';
 import './window-manager.jsx';
 import './apps.jsx';
@@ -35,16 +36,27 @@ function useIsMobile() {
 function loadData() {
   window.BLOG_POSTS = [];
   window.BLOG_CATEGORIES = [];
-  return fetch('api/posts')
-    .then(r => r.json())
-    .then(res => {
+  window.BLOG_ABOUT = {};
+  const getJson = (url) => fetch(url).then(r => r.json());
+  return Promise.all([
+    getJson('api/posts').then(res => {
       if (res.ok && res.data) {
         window.BLOG_POSTS      = res.data.posts      || [];
         window.BLOG_CATEGORIES = res.data.categories || [];
       }
-    })
-    .catch(() => console.warn('jrobertoma: no se pudo contactar con api/posts'));
+    }).catch(() => console.warn('jrobertoma: no se pudo contactar con api/posts')),
+    getJson('api/about').then(res => {
+      if (res.ok && res.data) window.BLOG_ABOUT = res.data;
+    }).catch(() => console.warn('jrobertoma: no se pudo contactar con api/about')),
+  ]);
 }
+
+// Iniciales del autor: las del "Sobre mí" o, si no hay, las del nombre
+window.aboutInitials = () => {
+  const a = window.BLOG_ABOUT || {};
+  if (a.initials) return a.initials;
+  return (a.name || 'jr').split(/\s+/).filter(w => /^\p{L}/u.test(w)).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+};
 const dataReady = loadData();
 
 function Root() {
@@ -61,15 +73,14 @@ function Root() {
   }, []);
 
   useEffect(() => {
-    const map = {
-      'neon-green': ['#39ff14', '#00f0ff'],
-      'cyan':       ['#00f0ff', '#39ff14'],
-      'magenta':    ['#ff00d4', '#00f0ff'],
-      'amber':      ['#ffb800', '#ff00d4'],
-    };
-    const [neon, neon2] = map[tweaks.accent] || map['neon-green'];
-    document.documentElement.style.setProperty('--neon', neon);
-    document.documentElement.style.setProperty('--neon-2', neon2);
+    const accent = window.ACCENTS.find(a => a.id === tweaks.accent) || window.ACCENTS[0];
+    const [neon, neon2] = accent.colors;
+    const rgb = (hex) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(', ');
+    const root = document.documentElement.style;
+    root.setProperty('--neon', neon);
+    root.setProperty('--neon-2', neon2);
+    root.setProperty('--neon-rgb', rgb(neon));      // para rgba(var(--neon-rgb), .x)
+    root.setProperty('--neon-2-rgb', rgb(neon2));
   }, [tweaks.accent]);
 
   useEffect(() => {
@@ -78,9 +89,13 @@ function Root() {
 
   if (!ready) return null;
 
-  return isMobile
-    ? <window.Mobile tweaks={tweaks} setTweak={setTweak} />
-    : <window.Desktop tweaks={tweaks} setTweak={setTweak} />;
+  return (
+    <window.TweaksContext.Provider value={{ tweaks, setTweak }}>
+      {isMobile
+        ? <window.Mobile tweaks={tweaks} setTweak={setTweak} />
+        : <window.Desktop tweaks={tweaks} setTweak={setTweak} />}
+    </window.TweaksContext.Provider>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<Root />);

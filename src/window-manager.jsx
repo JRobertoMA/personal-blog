@@ -10,13 +10,9 @@ function useWindowManager() {
   const openWindow = useCallback((config) => {
     const id = config.id || ('win-' + Date.now());
     setWindows(ws => {
-      const existing = ws.find(w => w.id === id);
-      if (existing) {
-        if (existing.minimized) {
-          setWindows(prev => prev.map(w => w.id === id ? { ...w, minimized: false, z: ++zCounter.current } : w));
-        }
-        setFocused(id);
-        return ws;
+      // Ya abierta: se restaura (si estaba minimizada) y se trae al frente
+      if (ws.some(w => w.id === id)) {
+        return ws.map(w => w.id === id ? { ...w, minimized: false, z: ++zCounter.current } : w);
       }
       const count = ws.length;
       const defaultW = config.width  || 640;
@@ -44,8 +40,9 @@ function useWindowManager() {
     setFocused(f => f === id ? null : f);
   }, []);
 
+  // Enfocar también restaura: una ventana minimizada no puede estar al frente
   const focusWindow = useCallback((id) => {
-    setWindows(ws => ws.map(w => w.id === id ? { ...w, z: ++zCounter.current } : w));
+    setWindows(ws => ws.map(w => w.id === id ? { ...w, minimized: false, z: ++zCounter.current } : w));
     setFocused(id);
   }, []);
 

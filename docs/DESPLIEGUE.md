@@ -49,13 +49,16 @@ Copia `.env.example` como `.env`, rellena los datos de IONOS y súbelo a `/`.
 ## 4. PHP y SSL
 
 - **PHP ≥ 8.1** (en *Hosting → PHP*). Se usa `str_starts_with`, arrow functions, etc.
-- Activa el **certificado SSL** del dominio. El `.htaccess` ya redirige a HTTPS.
+- **SSL**: IONOS no emite certificado porque los DNS están en Cloudflare. El HTTPS lo da Cloudflare en modo
+  Flexible; la configuración completa está en [CLOUDFLARE.md](CLOUDFLARE.md). El `.htaccess` ya redirige a HTTPS.
 - Cuando confirmes que todo va por HTTPS, descomenta la línea `Strict-Transport-Security` del `.htaccess`.
 - Dale permisos de escritura a `uploads/media/` (755 suele bastar en IONOS).
 
 ## 5. Capa extra para el panel (recomendado)
 
 IONOS permite proteger archivos/carpetas con usuario y contraseña (*Hosting → Protección de directorios* o `.htpasswd`). Protege `admin.html` para que ni siquiera se vea el formulario de login.
+
+Con Cloudflare delante, la protección principal es **Cloudflare Access** (ver [CLOUDFLARE.md](CLOUDFLARE.md#4-proteger-el-panel-con-cloudflare-access)).
 
 ## 6. Comprobaciones tras subir
 

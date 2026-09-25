@@ -1,6 +1,28 @@
 <?php
+// Lee un .env sencillo: CLAVE=valor, comentarios con # o ;, valores con o sin
+// comillas. No se usa parse_ini_file() porque falla con "#", "(", "!", etc.
+function parseEnvFile(string $path): array {
+    $vars = [];
+    foreach (file($path, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || $line[0] === ';') continue;
+        if (!preg_match('/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/', $line, $m)) continue;
+        $value = $m[2];
+        if (preg_match('/^"((?:[^"\\\\]|\\\\.)*)"/', $value, $q)) {
+            $value = strtr($q[1], ['\\"' => '"', '\\\\' => '\\']);
+        } elseif (preg_match("/^'([^']*)'/", $value, $q)) {
+            $value = $q[1];
+        } else {
+            $value = trim(preg_replace('/\s+[#;].*$/', '', $value)); // comentario al final de línea
+        }
+        $vars[$m[1]] = $value;
+    }
+    return $vars;
+}
+
 // Busca el .env primero FUERA de la carpeta pública (recomendado en IONOS)
-// y como último recurso en la raíz del proyecto.
+// y como último recurso en la raíz del proyecto. Solo acepta uno que tenga
+// DB_NAME, para no tomar por error el .env de otra aplicación.
 function loadEnv(): array {
     static $env = null;
     if ($env !== null) return $env;
@@ -11,11 +33,11 @@ function loadEnv(): array {
     ];
     $env = [];
     foreach ($paths as $path) {
-        if (is_readable($path)) {
-            $parsed = parse_ini_file($path, false, INI_SCANNER_RAW);
-            if ($parsed) { $env = $parsed; break; }
-        }
+        if (!is_readable($path)) continue;
+        $parsed = parseEnvFile($path);
+        if (isset($parsed['DB_NAME'])) { $env = $parsed; break; }
     }
+    if (!$env) error_log('[jrobertoma api] No se encontró un .env válido con DB_NAME');
     return $env;
 }
 
@@ -48,6 +70,15 @@ function getDB(): PDO {
         throw new RuntimeException('No se pudo conectar a la base de datos: ' . $e->getMessage());
     }
     return $pdo;
+}
+
+// settings.value es TEXT: MariaDB admite como máximo 65 535 BYTES (no caracteres).
+// Un emoji ocupa 4 bytes, así que hay que comprobar el tamaño en bytes antes de
+// guardar; si no, MariaDB rechaza el valor y el usuario solo ve un error 500.
+const SETTINGS_VALUE_MAX_BYTES = 65535;
+
+function fitsSettingsValue(string $value): bool {
+    return strlen($value) <= SETTINGS_VALUE_MAX_BYTES;
 }
 
 function clientIp(): string {
