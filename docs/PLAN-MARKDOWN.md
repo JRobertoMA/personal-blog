@@ -1,6 +1,6 @@
 # Plan: editor e intérprete de Markdown para posts
 
-Estado de partida: rama `claude/practical-pasteur-2ur05z`, commit `823813c`.
+Estado de partida: rama `claude/practical-pasteur-2ur05z`, commit `823813c`. Ver «Estado» en la sección 4.
 
 ## 1. Diagnóstico
 
@@ -163,11 +163,26 @@ Mejorar el `<textarea>` sin dependencias pesadas. CodeMirror 6 añadiría unos 1
 - Búsqueda pública también en el cuerpo del post (hoy solo busca en título y extracto).
 - Render en servidor (PHP) para SEO, RSS y vista previa al compartir. Hoy el contenido solo existe tras ejecutar JS, pero requeriría un parser Markdown en PHP sin Composer.
 
-## 4. Decisiones que necesitan tu visto bueno
+## 4. Decisiones tomadas
 
-1. **`markdown-it` frente a arreglar el parser propio.** Recomiendo `markdown-it`.
-2. **Imágenes externas.** Recomiendo mantener la CSP estricta y avisar en el editor (subir la imagen a Multimedia). La alternativa es abrir la CSP a `img-src 'self' data: https:`, que es más cómodo pero permite cargar imágenes que rastrean al lector.
-3. **Avisos `> [!NOTE]` e índice automático**: ¿los incluimos o prefieres algo más sobrio?
+1. **`markdown-it`** en lugar del parser propio.
+2. **Imágenes externas**: se mantiene la CSP estricta (`img-src 'self' data:`). El editor avisa y
+   marca la imagen en la vista previa para que se suba a Multimedia.
+3. **Avisos `> [!NOTE]` e índice automático**: incluidos. El índice solo aparece en posts con 3 o
+   más encabezados; en el móvil sale plegado.
+
+## Estado
+
+Fases 0 a 4 implementadas en la rama `claude/markdown-editor`. Cambios respecto al plan:
+
+- **Resaltado bajo demanda**: highlight.js va en un bundle aparte (`assets/hljs.js`, ~29 KB gzip)
+  que solo se descarga cuando un post tiene bloques de código.
+- **`entities` sustituido**: markdown-it arrastraba las 2 000+ entidades de HTML5 (~75 KB sin
+  comprimir). `src/shims/entities.js` cubre las habituales; las desconocidas se muestran literales.
+- Tamaño gzip resultante: `app.js` 65 → 93 KB, `admin.js` 56 → 90 KB.
+- El editor sigue siendo un `<textarea>` mejorado (sin CodeMirror).
+
+La Fase 5 (publicación programada, renombrar slug, render en PHP) sigue pendiente.
 
 ## 5. Archivos afectados
 

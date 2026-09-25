@@ -213,6 +213,7 @@ function useReadingProgress(ref, dep) {
 function PostScreen({ id }) {
   const { post, loading, error } = window.usePost(id);
   const [showComments, setShowComments] = useState(false);
+  const [zoom, setZoom] = useState(null); // imagen del post a pantalla completa
   const articleRef = useRef(null);
   const pct = useReadingProgress(articleRef, post?.body);
   const posts = window.BLOG_POSTS || [];
@@ -220,7 +221,13 @@ function PostScreen({ id }) {
   const newer = idx > 0 ? posts[idx - 1] : null;
   const older = idx >= 0 && idx < posts.length - 1 ? posts[idx + 1] : null;
 
-  useEffect(() => { window.trackView(id); setShowComments(false); }, [id]);
+  useEffect(() => { window.trackView(id); setShowComments(false); setZoom(null); }, [id]);
+  useEffect(() => {
+    if (!zoom) return;
+    const onKey = (e) => { if (e.key === 'Escape') setZoom(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoom]);
   useEffect(() => { if (post?.title) document.title = post.title + ' — jrobertoma'; return () => { document.title = 'jrobertoma.com'; }; }, [post?.title]);
 
   const back = () => (history.length > 1 ? history.back() : go(''));
@@ -261,7 +268,7 @@ function PostScreen({ id }) {
 
             {loading && !post.body
               ? <div className="m-skeleton" aria-busy="true"><div /><div /><div /></div>
-              : <div className="m-prose" dangerouslySetInnerHTML={{ __html: window.renderMarkdown(post.body) }} />}
+              : <window.PostBody body={post.body} className="m-prose" tocOpen={false} onOpenImage={(src, alt) => setZoom({ src, alt })} />}
 
             <div className="m-article-end">
               <span>— Gracias por leer. {window.aboutInitials()}</span>
@@ -285,6 +292,13 @@ function PostScreen({ id }) {
           </article>
         )}
       </main>
+      {zoom && (
+        <div className="m-lightbox" role="dialog" aria-modal="true" aria-label={zoom.alt || 'Imagen'} onClick={() => setZoom(null)}>
+          <img src={zoom.src} alt={zoom.alt} />
+          {zoom.alt && <p>{zoom.alt}</p>}
+          <button className="m-lightbox-close" autoFocus aria-label="Cerrar imagen">✕</button>
+        </div>
+      )}
     </>
   );
 }

@@ -6,7 +6,8 @@ Solo hace falta si modificas algo en `src/`. Los archivos compilados ya van en e
 
 ```bash
 npm install
-npm run build        # genera assets/app.js y assets/admin.js
+npm test             # pruebas del intérprete de Markdown (incluye casos de XSS)
+npm run build        # genera assets/app.js, assets/admin.js y assets/hljs.js
 npm run watch        # opcional: recompila al guardar mientras desarrollas
 ```
 
@@ -35,13 +36,13 @@ Estructura recomendada en el espacio web:
     ├── index.html
     ├── admin.html
     ├── api/              (con su .htaccess)
-    ├── assets/           (styles.css, mobile.css, app.js, admin.js)
+    ├── assets/           (prose.css, styles.css, mobile.css, app.js, admin.js, hljs.js)
     └── uploads/          (con su .htaccess y uploads/media/)
 ```
 
 En **Dominios y SSL → tu dominio → Destino**, apunta el dominio a `/blog`.
 
-**No subas**: `src/`, `node_modules/`, `docs/`, `schema.sql`, `package*.json`, `build.mjs`, `.git/`.
+**No subas**: `src/`, `tests/`, `node_modules/`, `docs/`, `schema.sql`, `package*.json`, `build.mjs`, `.git/`.
 (Están bloqueados por `.htaccess` por si acaso, pero es mejor que no estén.)
 
 Copia `.env.example` como `.env`, rellena los datos de IONOS y súbelo a `/`.

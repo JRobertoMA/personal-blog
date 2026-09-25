@@ -1,15 +1,7 @@
+import { api, setCsrfToken, uploadMedia } from './admin-api.js';
+import { Editor } from './editor.jsx';
+
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
-
-let _csrfToken = '';
-
-async function api(path, opts = {}) {
-  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  if (_csrfToken && opts.method && opts.method !== 'GET') {
-    headers['X-CSRF-Token'] = _csrfToken;
-  }
-  const res = await fetch('api' + path, { ...opts, headers });
-  return res.json();
-}
 
 // ── Simple markdown renderer ───────────────────────────────────
 const renderMd = (text) => window.renderMarkdown(text);
@@ -25,7 +17,7 @@ function LoginScreen({ onLogin }) {
     e.preventDefault(); setError(''); setLoading(true);
     try {
       const res = await api('/auth/login', { method: 'POST', body: JSON.stringify({ username: user, password: pass }) });
-      if (res.ok) { _csrfToken = res.data.csrf_token; onLogin(res.data.username); }
+      if (res.ok) { setCsrfToken(res.data.csrf_token); onLogin(res.data.username); }
       else setError(res.error || 'Credenciales incorrectas');
     } catch { setError('Error de red. Intenta de nuevo.'); }
     finally { setLoading(false); }
@@ -155,103 +147,6 @@ function PostsList({ onEdit, onNew }) {
   );
 }
 
-// ── Editor ─────────────────────────────────────────────────────
-function Editor({ initial, onSaved, onBack }) {
-  const [cats, setCats] = useState([]);
-  const [tab, setTab] = useState('edit');
-  const [form, setForm] = useState({
-    id: initial?.id || '',
-    title: initial?.title || '',
-    body: initial?.body || '',
-    excerpt: initial?.excerpt || '',
-    category_id: initial?.category_id || '',
-    status: initial?.status || 'draft',
-    date: initial?.date || new Date().toISOString().slice(0,10),
-    tags: (initial?.tags||[]).join(', '),
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => { api('/categories').then(r => { if (r.ok) setCats(r.data); }); }, []);
-
-  const set = (k, v) => setForm(f => ({...f, [k]: v}));
-
-  const save = async () => {
-    setSaving(true); setError('');
-    const payload = { ...form, tags: form.tags.split(',').map(t=>t.trim()).filter(Boolean) };
-    const r = initial?.id
-      ? await api(`/posts/${initial.id}`, { method: 'PATCH', body: JSON.stringify(payload) })
-      : await api('/posts', { method: 'POST', body: JSON.stringify(payload) });
-    setSaving(false);
-    if (r.ok) onSaved();
-    else setError(r.error || 'Error al guardar');
-  };
-
-  return (
-    <>
-      <div className="page-header">
-        <div><h1 className="page-title">{initial ? 'Editar post' : 'Nuevo post'}</h1></div>
-        <div className="page-actions">
-          <button className="btn" onClick={onBack}>← Volver</button>
-          <button className="btn primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
-        </div>
-      </div>
-      {error && <div style={{color:'var(--danger)',fontSize:12,marginBottom:12}}>{error}</div>}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 280px',gap:20}}>
-        <div>
-          <div className="form-group">
-            <label className="form-label">Título</label>
-            <input className="form-input" value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Título del post" />
-          </div>
-          <div className="tabs">
-            <div className={`tab${tab==='edit'?' active':''}`} onClick={()=>setTab('edit')}>Editar</div>
-            <div className={`tab${tab==='preview'?' active':''}`} onClick={()=>setTab('preview')}>Preview</div>
-          </div>
-          {tab === 'edit'
-            ? <textarea className="form-input form-textarea" style={{height:340}} value={form.body} onChange={e=>set('body',e.target.value)} placeholder="Contenido en Markdown…" />
-            : <div className="md-preview" dangerouslySetInnerHTML={{__html: renderMd(form.body)}} />
-          }
-        </div>
-        <div>
-          <div className="form-group">
-            <label className="form-label">Categoría</label>
-            <select className="form-input form-select" value={form.category_id} onChange={e=>set('category_id',e.target.value)}>
-              <option value="">Seleccionar…</option>
-              {cats.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Estado</label>
-            <select className="form-input form-select" value={form.status} onChange={e=>set('status',e.target.value)}>
-              <option value="draft">Borrador</option>
-              <option value="published">Publicado</option>
-              <option value="scheduled">Programado</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Fecha</label>
-            <input className="form-input" type="date" value={form.date} onChange={e=>set('date',e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Slug / ID</label>
-            <input className="form-input" value={form.id} onChange={e=>set('id',e.target.value)} placeholder="mi-post-url" />
-            <div className="form-hint">Dejar vacío para auto-generar</div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Tags</label>
-            <input className="form-input" value={form.tags} onChange={e=>set('tags',e.target.value)} placeholder="linux, kernel, rust" />
-            <div className="form-hint">Separados por comas</div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Extracto</label>
-            <textarea className="form-input" style={{minHeight:80,resize:'vertical'}} value={form.excerpt} onChange={e=>set('excerpt',e.target.value)} placeholder="Breve descripción del post…" />
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
 // ── Categories & Tags ──────────────────────────────────────────
 function TagsManager() {
   const [cats, setCats] = useState([]);
@@ -342,9 +237,8 @@ function Media() {
 
   const upload = async (file) => {
     setUploading(true);
-    const fd = new FormData(); fd.append('file', file);
     try {
-      const res = await fetch('api/media', { method: 'POST', headers: { 'X-CSRF-Token': _csrfToken }, body: fd }).then(r=>r.json());
+      const res = await uploadMedia(file);
       if (res.ok) { const r2 = await api('/media'); if (r2.ok) setFiles(r2.data||[]); }
     } finally { setUploading(false); }
   };
@@ -721,7 +615,7 @@ function AboutEditor() {
             </div>
             {tab === 'edit'
               ? <textarea className="form-input form-textarea" style={{ height: 220 }} value={form.bio} maxLength={10000} onChange={e => set('bio', e.target.value)} placeholder="Cuéntale al lector quién eres… (deja una línea en blanco entre párrafos)" />
-              : <div className="md-preview" dangerouslySetInnerHTML={{ __html: renderMd(form.bio) }} />}
+              : <div className="md-preview md" dangerouslySetInnerHTML={{ __html: renderMd(form.bio) }} />}
           </div>
 
           <div className="card about-card">
@@ -881,8 +775,10 @@ const NAV = [
 function AdminShell({ username, onLogout }) {
   const [view,      setView]  = useState('dashboard');
   const [collapsed, setCol]   = useState(false);
-  const [editPost,  setEdit]  = useState(null);
-  const [newPost,   setNew]   = useState(false);
+  const [editId,    setEditId]  = useState(null); // null = post nuevo
+  const [editKey,   setEditKey] = useState(0);    // remonta el editor en cada apertura
+  // El editor registra aquí si tiene cambios sin guardar
+  const guardRef = useRef(null);
 
   const theme = () => {
     const html = document.documentElement;
@@ -895,19 +791,28 @@ function AdminShell({ username, onLogout }) {
     if (t) document.documentElement.setAttribute('data-theme', t);
   }, []);
 
+  const leaveOk = () => !guardRef.current?.() || confirm('Hay cambios sin guardar en el post. ¿Salir sin guardar?');
+  const navigate = (v) => {
+    if (!leaveOk()) return false;
+    guardRef.current = null;
+    setView(v);
+    return true;
+  };
+
   const logout = async () => {
+    if (!leaveOk()) return;
     await api('/auth/logout', { method: 'POST' });
     onLogout();
   };
 
-  const goNew  = () => { setEdit(null); setNew(true); setView('editor'); };
-  const goEdit = (p) => { setEdit(p); setNew(false); setView('editor'); };
-  const saved  = () => { setView('posts'); setEdit(null); setNew(false); };
+  const openEditor = (id) => { if (navigate('editor')) { setEditId(id); setEditKey(k => k + 1); } };
+  const goNew  = () => openEditor(null);
+  const goEdit = (p) => openEditor(p.id);
 
   const sections = [...new Set(NAV.map(n=>n.section))];
 
   let content;
-  if (view === 'editor')   content = <Editor initial={editPost} onSaved={saved} onBack={()=>setView('posts')} />;
+  if (view === 'editor')   content = <Editor key={editKey} postId={editId} onBack={() => navigate('posts')} registerGuard={fn => { guardRef.current = fn; }} />;
   else if (view === 'dashboard') content = <Dashboard onNewPost={goNew} />;
   else if (view === 'posts')     content = <PostsList onEdit={goEdit} onNew={goNew} />;
   else if (view === 'tags')      content = <TagsManager />;
@@ -931,7 +836,7 @@ function AdminShell({ username, onLogout }) {
             <div key={sec} className="sb-section">
               <div className="label">{sec}</div>
               {NAV.filter(n=>n.section===sec).map(n => (
-                <div key={n.id} className={`sb-item${view===n.id||view==='editor'&&n.id==='posts'?' active':''}`} onClick={()=>setView(n.id)}>
+                <div key={n.id} className={`sb-item${view===n.id||view==='editor'&&n.id==='posts'?' active':''}`} onClick={()=>navigate(n.id)}>
                   <span className="ico">{n.ico}</span>
                   <span className="lbl">{n.label}</span>
                 </div>
@@ -965,7 +870,7 @@ function App() {
 
   useEffect(() => {
     api('/auth/me').then(r => {
-      if (r.ok) { _csrfToken = r.data.csrf_token; setUser(r.data.username); }
+      if (r.ok) { setCsrfToken(r.data.csrf_token); setUser(r.data.username); }
     }).finally(() => setChecking(false));
   }, []);
 
