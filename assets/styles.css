@@ -388,6 +388,7 @@ html, body { margin: 0; padding: 0; }
 .reader-main .post-body { font-size: 13px; line-height: 1.7; color: var(--text-dim); }
 .reader-main .post-body h2 { font-size: 15px; font-weight: 600; color: var(--neon); margin: 20px 0 8px; }
 .reader-main .post-body p { margin: 0 0 12px; }
+.app .post-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .app .post-body pre { font-size: 12px; }
 .app .post-body h3 { font-family: var(--font-display); font-size: 15px; margin: 20px 0 6px; }
 .app .post-body h4 { font-size: 13.5px; margin: 16px 0 6px; }
