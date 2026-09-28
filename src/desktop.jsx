@@ -81,9 +81,17 @@ function Desktop({ tweaks, setTweak }) {
   const windowsRef = useRef(wm.windows);
   windowsRef.current = wm.windows;
 
-  // Click sound
+  // Click sound. El navegador no deja crear audio antes de que el usuario
+  // interactúe: las ventanas que se abren solas al arrancar no suenan.
+  const userActed = useRef(false);
+  useEffect(() => {
+    const mark = () => { userActed.current = true; };
+    window.addEventListener('pointerdown', mark, { once: true, capture: true });
+    window.addEventListener('keydown', mark, { once: true, capture: true });
+    return () => { window.removeEventListener('pointerdown', mark, true); window.removeEventListener('keydown', mark, true); };
+  }, []);
   const click = useCallback(() => {
-    if (!soundOn) return;
+    if (!soundOn || !userActed.current) return;
     try {
       if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
       const ctx = audioCtxRef.current;

@@ -39,6 +39,45 @@ const inlineImageOpener = (openImage) => openImage && ((src, alt, img) => openIm
   height: img?.naturalHeight || null,
 }));
 
+// ── Compartir un post ─────────────────────────────────────────
+// "Copiar enlace" funciona en cualquier navegador; "Compartir…" abre el menú del
+// sistema cuando el navegador lo ofrece (Chrome/Edge en Windows, Safari en macOS).
+const postUrl = (id) => new URL('post/' + encodeURIComponent(id), document.baseURI).href;
+
+async function copyToClipboard(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) {}
+  ta.remove();
+  return ok;
+}
+
+function ShareButtons({ post }) {
+  const [copied, setCopied] = useS(null); // null | 'ok' | 'error'
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const url = postUrl(post.id);
+  const copy = async () => {
+    setCopied((await copyToClipboard(url)) ? 'ok' : 'error');
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(null), 2000);
+  };
+  const share = async () => {
+    try { await navigator.share({ title: post.title, text: post.excerpt || undefined, url }); } catch (e) {}
+  };
+  return (
+    <>
+      <button className="btn-neon" onClick={copy} title={url} aria-live="polite">
+        {copied === 'ok' ? '✓ Enlace copiado' : copied === 'error' ? 'No se pudo copiar' : '🔗 Copiar enlace'}
+      </button>
+      {typeof navigator.share === 'function' && <button className="btn-neon" onClick={share}>Compartir…</button>}
+    </>
+  );
+}
+
 // Cuenta una visita por post y por sesión del navegador
 function trackView(id) {
   if (!id) return;
@@ -92,13 +131,14 @@ function ReaderApp({ onOpenComments, onOpenImage }) {
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-faint)' }}>
               ─── Gracias por leer. — {window.aboutInitials()}
             </p>
-            {onOpenComments && (
-              <div style={{ marginTop: 8 }}>
+            <div className="post-actions">
+              {onOpenComments && (
                 <button className="btn-neon" onClick={() => onOpenComments(post.id)}>
                   Comentarios ({post.comment_count || 0})
                 </button>
-              </div>
-            )}
+              )}
+              <ShareButtons post={post} />
+            </div>
           </>
         ) : (
           <div style={{ color: 'var(--text-faint)', fontSize: 13 }}>Selecciona un post</div>
@@ -302,10 +342,11 @@ function PostApp({ postId, onOpenComments, onOpenImage }) {
         : <window.PostBody body={post.body} onOpenImage={inlineImageOpener(onOpenImage)} />}
       <h2>// fin</h2>
       <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-faint)' }}>─── Gracias por leer. — {window.aboutInitials()}</p>
-      <div style={{ marginTop: 8 }}>
+      <div className="post-actions">
         <button className="btn-neon" onClick={() => onOpenComments && onOpenComments(post.id)}>
           Comentarios ({post.comment_count || 0})
         </button>
+        <ShareButtons post={post} />
       </div>
     </div>
   );
