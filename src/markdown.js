@@ -243,8 +243,8 @@ function handleMarkdownClick(e, opts = {}) {
     });
     return;
   }
-  // Anclas internas (#seccion, notas al pie): el hash de la URL lo usa el router
-  // del móvil, así que se desplaza dentro del post sin tocar location.hash.
+  // Anclas internas (#seccion, notas al pie): se desplaza dentro del contenedor
+  // del post (en el escritorio puede haber varios abiertos) sin tocar la URL.
   const a = e.target.closest('a[href^="#"]');
   if (a && root.contains(a)) {
     e.preventDefault();

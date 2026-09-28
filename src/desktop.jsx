@@ -68,8 +68,9 @@ const MAX_POST_WINDOWS = 4;
 
 function Desktop({ tweaks, setTweak }) {
   const wm = window.useWindowManager();
-  // Un enlace compartido (#/post/id) va directo al post, sin animación de arranque
-  const sharedPostId = (location.hash.match(/^#\/post\/(.+)$/) || [])[1];
+  // Un enlace a un post (/post/<slug>) va directo a él, sin animación de arranque
+  const basePath = new URL(document.baseURI).pathname.replace(/[^/]*$/, '');
+  const sharedPostId = (location.pathname.slice(basePath.length).match(/^post\/([^/]+)\/?$/) || [])[1];
   const [booted,     setBooted]  = useS(!tweaks.showBoot || !!sharedPostId);
   const [menuOpen,   setMenu]    = useS(false);
   const [menuQuery,  setMQ]      = useS('');

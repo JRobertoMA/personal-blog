@@ -3,13 +3,17 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<!-- page.php sustituye este bloque por el <head> de cada página (título, canonical, OG, JSON-LD) -->
+<!--seo-->
+<base href="/" />
 <title>jrobertoma.com</title>
 <meta name="description" content="Blog de J. Roberto M. sobre Linux, desarrollo, hardware, seguridad y retro-informática." />
-<meta name="theme-color" content="#08090b" />
-<meta name="color-scheme" content="dark" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="jrobertoma.com" />
 <meta property="og:description" content="Software · hardware · linux · etc" />
+<!--/seo-->
+<meta name="theme-color" content="#08090b" />
+<meta name="color-scheme" content="dark" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2308090b'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='16' font-weight='700' text-anchor='middle' fill='%2339ff14'%3Ejr%3C/text%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -29,6 +33,18 @@
   #app-loading.hidden { opacity: 0; pointer-events: none; }
   #app-loading .logo { font-size: 44px; font-weight: 700; letter-spacing: -0.04em; margin-bottom: 8px; text-shadow: 0 0 20px #39ff14; }
   #app-loading .sub { font-size: 11px; color: #a0a6b0; letter-spacing: 0.3em; text-transform: uppercase; }
+  /* HTML de page.php (buscadores y sin JavaScript); React lo reemplaza al arrancar */
+  .ssr { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; color: #e6e8ec; font: 16px/1.65 'Inter', system-ui, sans-serif; }
+  .ssr a { color: #39ff14; }
+  .ssr h1 { font-size: 30px; line-height: 1.2; margin: 18px 0 8px; }
+  .ssr-nav, .ssr-crumbs, .ssr-meta, .ssr-foot, .ssr-tags, .ssr-prevnext { font-size: 14px; color: #a0a6b0; }
+  .ssr-list { list-style: none; padding: 0; }
+  .ssr-prevnext, .ssr-tags { margin-top: 24px; }
+  .ssr-list h2 { font-size: 20px; margin: 24px 0 2px; }
+  .ssr-foot { margin-top: 48px; border-top: 1px solid #2a2f38; padding-top: 16px; }
+  .ssr-body pre { overflow-x: auto; padding: 12px; background: #030405; border: 1px solid #2a2f38; border-radius: 6px; }
+  html:has(#root > .ssr), html:has(#root > .ssr) body { overflow: auto !important; }
+  html:has(#root > .ssr) #root { height: auto !important; }
 </style>
 </head>
 <body>
@@ -41,7 +57,8 @@
 <div id="root"></div>
 
 <noscript>
-  <p style="color:#e6e8ec;font-family:system-ui;padding:24px">Este blog necesita JavaScript para funcionar.</p>
+  <style>#app-loading { display: none; }</style>
+  <p style="color:#a0a6b0;font-family:system-ui;padding:0 16px;text-align:center">Activa JavaScript para la versión completa (escritorio y móvil interactivos).</p>
 </noscript>
 
 <script src="assets/app.js" defer></script>

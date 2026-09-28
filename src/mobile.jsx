@@ -1,7 +1,8 @@
 // ─── Versión móvil ─────────────────────────────────────────────
 // Lector de blog nativo para pantallas táctiles: cabecera fija, barra de
-// pestañas inferior, rutas con hash (#/post/id) para que el botón "atrás"
-// del teléfono funcione y los posts se puedan compartir.
+// pestañas inferior, rutas reales (/post/<slug>) con la History API para que
+// el botón "atrás" del teléfono funcione, los posts se puedan compartir y cada
+// página tenga su URL para los buscadores (page.php sirve su HTML).
 (function() {
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -26,11 +27,19 @@ const I = {
   up:     ['M12 19V5', 'm5 12 7-7 7 7'],
 };
 
-// ── Router por hash ───────────────────────────────────────────
-function parseHash() {
-  const raw = decodeURIComponent((location.hash || '').replace(/^#\/?/, ''));
-  const [section = '', ...rest] = raw.split('/');
-  const param = rest.join('/');
+// ── Router (History API) ─────────────────────────────────────
+// Las rutas son relativas a <base href> (page.php lo ajusta a la carpeta del sitio).
+const BASE_PATH = new URL(document.baseURI).pathname.replace(/[^/]*$/, '');
+
+function currentPath() {
+  const p = location.pathname;
+  return (p.startsWith(BASE_PATH) ? p.slice(BASE_PATH.length) : p.replace(/^\//, '')).replace(/\/+$/, '');
+}
+
+function parseRoute() {
+  const [section = '', ...rest] = currentPath().split('/');
+  let param = rest.join('/');
+  try { param = decodeURIComponent(param); } catch {}
   switch (section) {
     case 'post':      return { name: 'post', id: param };
     case 'buscar':    return { name: 'search', q: param };
@@ -42,17 +51,50 @@ function parseHash() {
     default:          return { name: 'home', cat: 'all' };
   }
 }
-const go = (path) => { location.hash = '#/' + path; };
+
+const NAV_EVENT = 'jr:navigate';
+const go = (path, replace = false) => {
+  history[replace ? 'replaceState' : 'pushState'](null, '', BASE_PATH + path);
+  window.dispatchEvent(new Event(NAV_EVENT));
+};
+
+// Enlace interno de la app (no API, recursos, feed ni el panel)
+function internalPath(a) {
+  if (a.target && a.target !== '_self') return null;
+  if (a.hasAttribute('download')) return null;
+  const url = new URL(a.href, document.baseURI);
+  if (url.origin !== location.origin || !url.pathname.startsWith(BASE_PATH)) return null;
+  const rel = url.pathname.slice(BASE_PATH.length);
+  if (/^(api|assets|uploads)\//.test(rel) || /\.(xml|txt|html|php)$/i.test(rel)) return null;
+  if (url.hash && url.pathname === location.pathname) return null; // ancla en la misma página
+  return rel + url.search;
+}
 
 function useRoute(onLeave) {
-  const [route, setRoute] = useState(parseHash);
+  const [route, setRoute] = useState(parseRoute);
   const leaveRef = useRef(onLeave);
   leaveRef.current = onLeave;
   useEffect(() => {
     // onLeave se ejecuta antes de re-renderizar: el DOM aún es la pantalla anterior
-    const onHash = () => { leaveRef.current?.(); setRoute(parseHash()); };
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+    const onNav = () => { leaveRef.current?.(); setRoute(parseRoute()); };
+    // Los enlaces <a href="post/…"> navegan sin recargar la página
+    const onClick = (e) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = e.target.closest?.('a[href]');
+      const path = a && internalPath(a);
+      if (path === null || path === undefined) return;
+      e.preventDefault();
+      if (BASE_PATH + path !== location.pathname + location.search) go(path);
+    };
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; // el scroll lo gestiona Mobile
+    window.addEventListener('popstate', onNav);
+    window.addEventListener(NAV_EVENT, onNav);
+    document.addEventListener('click', onClick);
+    return () => {
+      window.removeEventListener('popstate', onNav);
+      window.removeEventListener(NAV_EVENT, onNav);
+      document.removeEventListener('click', onClick);
+    };
   }, []);
   return route;
 }
@@ -74,7 +116,7 @@ function TopBar({ title, onBack, right, brand }) {
         ? <button className="m-iconbtn" onClick={onBack} aria-label="Volver"><Icon d={I.back} /></button>
         : null}
       {brand
-        ? <a className="m-brand" href="#/" aria-label="Inicio">jr<span>·</span>os</a>
+        ? <a className="m-brand" href="./" aria-label="Inicio">jr<span>·</span>os</a>
         : <h1 className="m-topbar-title">{title}</h1>}
       <div className="m-topbar-right">{right}</div>
     </header>
@@ -91,7 +133,7 @@ function TabBar({ active }) {
   return (
     <nav className="m-tabbar" aria-label="Navegación principal">
       {tabs.map(t => (
-        <a key={t.id} href={'#/' + t.path}
+        <a key={t.id} href={t.path || './'}
           className={`m-tab${active === t.id ? ' active' : ''}`}
           aria-current={active === t.id ? 'page' : undefined}>
           <Icon d={t.icon} />
@@ -104,7 +146,7 @@ function TabBar({ active }) {
 
 function PostCard({ p, featured }) {
   return (
-    <a href={'#/post/' + encodeURIComponent(p.id)} className={`m-card${featured ? ' featured' : ''}`}
+    <a href={'post/' + encodeURIComponent(p.id)} className={`m-card${featured ? ' featured' : ''}`}
       style={{ '--cat': catColor(p) }}>
       <div className="m-card-meta">
         <span className="m-cat-dot" />
@@ -148,7 +190,7 @@ function HomeScreen({ cat }) {
   return (
     <>
       <TopBar brand right={
-        <a className="m-iconbtn" href="#/buscar" aria-label="Buscar"><Icon d={I.search} /></a>
+        <a className="m-iconbtn" href="buscar" aria-label="Buscar"><Icon d={I.search} /></a>
       } />
       <main className="m-main" id="contenido">
         {cat === 'all' && (
@@ -164,9 +206,9 @@ function HomeScreen({ cat }) {
         )}
 
         <div className="m-chips" ref={chipsRef} role="tablist" aria-label="Categorías">
-          <a href="#/" role="tab" aria-selected={cat === 'all'} className={`m-chip${cat === 'all' ? ' active' : ''}`}>Todos</a>
+          <a href="./" role="tab" aria-selected={cat === 'all'} className={`m-chip${cat === 'all' ? ' active' : ''}`}>Todos</a>
           {cats.map(c => (
-            <a key={c.id} href={'#/categoria/' + encodeURIComponent(c.id)} role="tab" aria-selected={cat === c.id}
+            <a key={c.id} href={'categoria/' + encodeURIComponent(c.id)} role="tab" aria-selected={cat === c.id}
               className={`m-chip${cat === c.id ? ' active' : ''}`} style={{ '--cat': c.color || 'var(--neon)' }}>
               {c.label}
             </a>
@@ -248,11 +290,11 @@ function PostScreen({ id }) {
       <main className="m-main m-main-post" id="contenido">
         {!post && loading && <div className="m-skeleton" aria-busy="true"><div /><div /><div /><div /></div>}
         {!post && !loading && (
-          <EmptyState title="Post no encontrado">{error}<a className="m-btn" href="#/">Volver al blog</a></EmptyState>
+          <EmptyState title="Post no encontrado">{error}<a className="m-btn" href="./">Volver al blog</a></EmptyState>
         )}
         {post && (
           <article ref={articleRef} className="m-article" style={{ '--cat': catColor(post) }}>
-            <a className="m-article-cat" href={'#/categoria/' + encodeURIComponent(post.category_id)}>
+            <a className="m-article-cat" href={'categoria/' + encodeURIComponent(post.category_id)}>
               <span className="m-cat-dot" />{post.category_label || post.category_id}
             </a>
             <h1 className="m-article-title">{post.title}</h1>
@@ -262,7 +304,7 @@ function PostScreen({ id }) {
             </div>
             {(post.tags || []).length > 0 && (
               <div className="m-article-tags">
-                {post.tags.map(t => <a key={t} className="m-tag" href={'#/tag/' + encodeURIComponent(t)}>#{t}</a>)}
+                {post.tags.map(t => <a key={t} className="m-tag" href={'tag/' + encodeURIComponent(t)}>#{t}</a>)}
               </div>
             )}
 
@@ -285,8 +327,8 @@ function PostScreen({ id }) {
 
             {(newer || older) && (
               <nav className="m-prevnext" aria-label="Más posts">
-                {older && <a href={'#/post/' + encodeURIComponent(older.id)}><small>← Anterior</small><span>{older.title}</span></a>}
-                {newer && <a href={'#/post/' + encodeURIComponent(newer.id)} className="next"><small>Siguiente →</small><span>{newer.title}</span></a>}
+                {older && <a href={'post/' + encodeURIComponent(older.id)}><small>← Anterior</small><span>{older.title}</span></a>}
+                {newer && <a href={'post/' + encodeURIComponent(newer.id)} className="next"><small>Siguiente →</small><span>{newer.title}</span></a>}
               </nav>
             )}
           </article>
@@ -388,7 +430,7 @@ function AboutScreen({ tweaks, setTweak }) {
             ))}
           </div>
         </section>
-        <a className="m-row-link" href="#/terminal">
+        <a className="m-row-link" href="terminal">
           <Icon d={I.term} /><span>Abrir la terminal<small>el easter egg de la versión escritorio</small></span><Icon d={I.chev} size={18} />
         </a>
       </main>

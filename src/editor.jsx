@@ -476,7 +476,7 @@ export function Editor({ postId, onBack, registerGuard }) {
           {dirty && !saving && <span className="ed-dirty">Cambios sin guardar</span>}
           <button className="btn" onClick={onBack}>← Volver</button>
           {savedId && form.status === 'published' && (
-            <a className="btn" href={`index.html#/post/${encodeURIComponent(savedId)}`} target="_blank" rel="noopener">Ver en el sitio ↗</a>
+            <a className="btn" href={`post/${encodeURIComponent(savedId)}`} target="_blank" rel="noopener">Ver en el sitio ↗</a>
           )}
           <button className="btn primary" onClick={() => save()} disabled={saving || !dirty} title="Ctrl+S">{saving ? 'Guardando…' : 'Guardar'}</button>
         </div>

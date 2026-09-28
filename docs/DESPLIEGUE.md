@@ -33,9 +33,10 @@ Estructura recomendada en el espacio web:
 ├── .env                  ← credenciales, fuera del alcance web
 └── blog/                 ← carpeta a la que apunta el dominio
     ├── .htaccess
-    ├── index.html
+    ├── index.html        (plantilla: la sirve page.php)
+    ├── page.php          (páginas, robots.txt, sitemap.xml y feed.xml)
     ├── admin.html
-    ├── api/              (con su .htaccess)
+    ├── api/              (con su .htaccess; incluye api/lib/)
     ├── assets/           (prose.css, styles.css, mobile.css, app.js, admin.js, hljs.js)
     └── uploads/          (con su .htaccess y uploads/media/)
 ```
@@ -73,4 +74,26 @@ Con Cloudflare delante, la protección principal es **Cloudflare Access** (ver [
 - `https://tudominio/schema.sql` → **403** (o 404 si no lo subiste).
 - `https://tudominio/api/config/database.php` → no debe mostrar nada sensible.
 - `https://tudominio/api/posts` → JSON con tus posts.
-- Abre la web en el móvil y comparte un post: el enlace `#/post/...` debe abrir directamente ese post.
+- Abre la web en el móvil y comparte un post: el enlace `/post/...` debe abrir directamente ese post.
+  Los enlaces antiguos `/#/post/...` siguen funcionando (se convierten solos).
+- `https://tudominio/post/<slug>` → **200**; el código fuente (Ctrl+U) debe incluir el título del post
+  en `<title>` y su texto dentro de `<div id="root">`.
+- `https://tudominio/post/no-existe` → **404**.
+- `https://tudominio/index.html` → redirige (301) a `https://tudominio/`.
+- `https://tudominio/robots.txt`, `/sitemap.xml` y `/feed.xml` → texto/XML con tus posts.
+
+## 7. Buscadores (una vez, tras el primer despliegue con URLs reales)
+
+1. **Google Search Console** (search.google.com/search-console): *Añadir propiedad → Dominio*,
+   `jrobertoma.com`. Te da un registro TXT: créalo en Cloudflare (*DNS → Add record → TXT*, nombre `@`).
+   Tras verificar, en *Sitemaps* envía `https://jrobertoma.com/sitemap.xml`.
+2. **Bing Webmaster Tools** (bing.com/webmasters): puedes importar el sitio desde Search Console.
+   Bing alimenta también a DuckDuckGo y Ecosia.
+3. **Cloudflare**: en *Security → Bots*, si usas *Bot Fight Mode*, comprueba en *Security → Events*
+   que no bloquea a Googlebot ni a Bingbot (Cloudflare los reconoce como *verified bots*).
+4. Comprueba un post en la **prueba de resultados enriquecidos** de Google
+   (search.google.com/test/rich-results): debe detectar *Artículo* y *Ruta de navegación*.
+5. Comprueba la vista previa al compartir con opengraph.xyz o el *Sharing Debugger* de Facebook.
+
+El dominio de las URLs canónicas, el sitemap y el feed sale del ajuste **Configuración → Sitio →
+Dominio** del panel (`site_domain`). Si cambias de dominio, actualízalo ahí.
