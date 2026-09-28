@@ -68,6 +68,12 @@ test('avisos estilo GitHub', () => {
   has('> [!WARNING] Cuidado con esto', 'md-alert-warning', '<p>Cuidado con esto</p>');
   has('> cita normal', '<blockquote>');
 });
+test('texto alternativo de las imágenes', () => {
+  const env = {};
+  window.renderMarkdown('![Diagrama del *kernel*](a.png) y ![](b.png)\n\n![](c.png "t")', env);
+  assert.deepEqual(env.images, ['a.png', 'b.png', 'c.png']);
+  assert.deepEqual(env.imageAlts, ['Diagrama del kernel', '', '']);
+});
 test('índice', () => {
   const { toc } = window.markdownOutline('# A\n\n### B\n\ntexto\n\n## C');
   assert.deepEqual(toc, [{ level: 2, id: 'a', text: 'A' }, { level: 3, id: 'b', text: 'B' }, { level: 2, id: 'c', text: 'C' }]);

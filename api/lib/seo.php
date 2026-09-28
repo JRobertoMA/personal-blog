@@ -51,7 +51,8 @@ function publishedPosts(PDO $db, string $where = '', array $params = [], int $li
 }
 
 function publishedPost(PDO $db, string $id): ?array {
-    $stmt = $db->prepare('SELECT ' . POST_COLUMNS . ", p.body FROM posts p JOIN categories c ON c.id = p.category_id
+    $cover = hasColumn($db, 'posts', 'cover_image') ? ', p.cover_image' : '';
+    $stmt = $db->prepare('SELECT ' . POST_COLUMNS . ", p.body$cover FROM posts p JOIN categories c ON c.id = p.category_id
                           WHERE p.id = ? AND p.status = 'published'");
     $stmt->execute([$id]);
     return $stmt->fetch() ?: null;
@@ -119,6 +120,34 @@ function firstImage(string $md): ?string {
     return null;
 }
 
+// ── Imagen para compartir (og:image) ──────────────────────────
+// Devuelve ['url', 'width', 'height', 'alt'] con URL absoluta; las dimensiones
+// salen de la tabla media cuando la imagen es de Multimedia.
+const OG_DEFAULT = ['path' => 'assets/og-default.png', 'width' => 1200, 'height' => 630];
+
+function imageMeta(PDO $db, string $origin, ?string $src, string $alt = ''): ?array {
+    if (!$src) return null;
+    $img = ['url' => absUrl($origin, $src), 'width' => null, 'height' => null, 'alt' => $alt];
+    if (preg_match('~^/?uploads/media/([^/?#]+)$~', $src, $m)) {
+        $stmt = $db->prepare('SELECT width, height FROM media WHERE filename = ?');
+        $stmt->execute([rawurldecode($m[1])]);
+        if ($row = $stmt->fetch()) { $img['width'] = $row['width']; $img['height'] = $row['height']; }
+    }
+    return $img;
+}
+
+function defaultImage(array $site): array {
+    return ['url' => $site['origin'] . '/' . OG_DEFAULT['path'], 'width' => OG_DEFAULT['width'],
+            'height' => OG_DEFAULT['height'], 'alt' => $site['title']];
+}
+
+// Portada elegida → primera imagen del post → imagen genérica del blog
+function postImage(PDO $db, array $site, array $post): array {
+    return imageMeta($db, $site['origin'], $post['cover_image'] ?? null, $post['title'])
+        ?? imageMeta($db, $site['origin'], firstImage($post['body']), $post['title'])
+        ?? defaultImage($site);
+}
+
 // Fecha legible en español: 28 abr 2026
 function fmtDate(string $iso): string {
     static $months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -158,8 +187,15 @@ function renderHead(array $m, array $site, string $base): string {
         'og:title'       => $m['og_title'] ?? $m['title'],
         'og:description' => $m['description'] ?? '',
         'og:url'         => $m['canonical'] ?? '',
-        'og:image'       => $m['image'] ?? '',
     ];
+    $img = $m['image'] ?? null;
+    if ($img) {
+        $og['og:image'] = $img['url'];
+        if (str_starts_with($img['url'], 'https://')) $og['og:image:secure_url'] = $img['url'];
+        $og['og:image:width']  = (string)($img['width'] ?? '');
+        $og['og:image:height'] = (string)($img['height'] ?? '');
+        $og['og:image:alt']    = (string)($img['alt'] ?? '');
+    }
     foreach ($og as $k => $v) if ($v !== '') $out[] = '<meta property="' . $k . '" content="' . h($v) . '" />';
     foreach ($m['article'] ?? [] as [$k, $v]) $out[] = '<meta property="' . h($k) . '" content="' . h($v) . '" />';
     $out[] = '<meta name="twitter:card" content="' . (!empty($m['image']) ? 'summary_large_image' : 'summary') . '" />';

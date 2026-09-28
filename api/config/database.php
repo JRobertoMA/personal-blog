@@ -103,6 +103,18 @@ function getDB(): PDO {
 // guardar; si no, MariaDB rechaza el valor y el usuario solo ve un error 500.
 const SETTINGS_VALUE_MAX_BYTES = 65535;
 
+// ¿Existe la columna? (para convivir con bases de datos sin la última migración)
+function hasColumn(PDO $db, string $table, string $column): bool {
+    static $cache = [];
+    $key = "$table.$column";
+    if (!isset($cache[$key])) {
+        $stmt = $db->prepare('SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?');
+        $stmt->execute([$table, $column]);
+        $cache[$key] = (bool)$stmt->fetchColumn();
+    }
+    return $cache[$key];
+}
+
 function fitsSettingsValue(string $value): bool {
     return strlen($value) <= SETTINGS_VALUE_MAX_BYTES;
 }

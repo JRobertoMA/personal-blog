@@ -143,13 +143,19 @@ function figuresRule(state) {
   }
 }
 
+// env.images: URLs de las imágenes; env.imageAlts: su texto alternativo (mismo orden)
 function collectImages(state) {
-  const images = [];
+  const images = [], alts = [];
   for (const t of state.tokens) {
     if (t.type !== 'inline') continue;
-    for (const k of t.children || []) if (k.type === 'image') images.push(k.attrGet('src'));
+    for (const k of t.children || []) {
+      if (k.type !== 'image') continue;
+      images.push(k.attrGet('src'));
+      alts.push((k.children || []).map(c => c.content).join('').trim());
+    }
   }
   state.env.images = images;
+  state.env.imageAlts = alts;
 }
 
 // ── Instancia ─────────────────────────────────────────────────
@@ -203,9 +209,9 @@ rules.fence = (tokens, i) => {
 rules.code_block = (tokens, i) => codeBlock(tokens[i].content, '');
 
 // ── API pública ───────────────────────────────────────────────
-// env (opcional) recibe env.toc y env.images tras renderizar
+// env (opcional) recibe env.toc, env.images y env.imageAlts tras renderizar
 function renderMarkdown(src, env = {}) {
-  if (!src) { env.toc = []; env.images = []; return ''; }
+  if (!src) { env.toc = []; env.images = []; env.imageAlts = []; return ''; }
   return md.render(String(src), env);
 }
 

@@ -15,9 +15,9 @@ const localDate = () => {
 const slugify = (t) => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 60).replace(/-+$/, '');
 
-const emptyForm = () => ({ id: '', title: '', body: '', excerpt: '', category_id: '', status: 'draft', date: localDate(), tags: '' });
+const emptyForm = () => ({ id: '', title: '', body: '', excerpt: '', cover_image: '', category_id: '', status: 'draft', date: localDate(), tags: '' });
 const fromPost = (p) => ({
-  id: p.id, title: p.title || '', body: p.body || '', excerpt: p.excerpt || '',
+  id: p.id, title: p.title || '', body: p.body || '', excerpt: p.excerpt || '', cover_image: p.cover_image || '',
   category_id: p.category_id || '', status: p.status || 'draft',
   date: String(p.date || '').slice(0, 10) || localDate(), tags: (p.tags || []).join(', '),
 });
@@ -204,7 +204,7 @@ const KEYS = [
 ];
 
 // ── Selector de Multimedia ────────────────────────────────────
-function MediaPicker({ onPick, onUpload, onClose }) {
+function MediaPicker({ onPick, onUpload, onClose, title = 'Insertar imagen' }) {
   const [files, setFiles] = useState(null);
   const inputRef = useRef(null);
   useEffect(() => {
@@ -217,9 +217,9 @@ function MediaPicker({ onPick, onUpload, onClose }) {
 
   return (
     <div className="ed-modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="ed-modal" role="dialog" aria-modal="true" aria-label="Insertar imagen">
+      <div className="ed-modal" role="dialog" aria-modal="true" aria-label={title}>
         <div className="ed-modal-head">
-          Insertar imagen
+          {title}
           <button className="btn sm" onClick={() => inputRef.current?.click()}>Subir desde el equipo…</button>
           <button className="btn sm" onClick={onClose} aria-label="Cerrar">✕</button>
           <input ref={inputRef} type="file" accept="image/*" multiple hidden onChange={e => { onUpload(e.target.files); onClose(); }} />
@@ -245,6 +245,44 @@ function MediaPicker({ onPick, onUpload, onClose }) {
 
 const altFromName = (name) => String(name || 'imagen').replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/[\[\]]/g, '').trim() || 'imagen';
 
+// ── SEO ───────────────────────────────────────────────────────
+const DESC_MAX = 155;   // Google corta la descripción hacia los 155–160 caracteres
+const TITLE_MAX = 60;   // …y el título hacia los 60
+
+// Texto alternativo vacío o genérico ("image", "captura de pantalla 2026…", "IMG_1234")
+const badAlt = (alt) => !alt || /^(image|imagen|img|foto|photo|picture|screenshot|captura( de pantalla)?|pasted|untitled|sin t[ií]tulo)[\s\d_.:-]*$/i.test(alt)
+  || /^(img|dsc|pxl|photo)[_-]?\d+/i.test(alt);
+
+const clip = (t, n) => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
+
+// Cómo se verá el post en Google y al compartirlo
+function SeoPreview({ form, site, slug, description, auto, image }) {
+  const title = `${form.title || 'Título del post'} — ${site.title}`;
+  return (
+    <div className="seo-preview">
+      <div className="seo-label">Resultado en Google</div>
+      <div className="seo-google">
+        <div className="seo-url">{site.domain} › post › {slug || 'slug'}</div>
+        <div className="seo-title">{clip(title, TITLE_MAX + 5)}</div>
+        <div className="seo-desc">{description ? clip(description, DESC_MAX + 5) : <em>Sin descripción: escribe un extracto.</em>}</div>
+      </div>
+      <div className="seo-label">Al compartir (WhatsApp, Mastodon, X…)</div>
+      <div className="seo-card">
+        <img src={image.src} alt="" />
+        <div className="seo-card-body">
+          <div className="seo-card-domain">{site.domain}</div>
+          <div className="seo-card-title">{form.title || 'Título del post'}</div>
+          <div className="seo-card-desc">{clip(description || '', 110)}</div>
+        </div>
+      </div>
+      <div className="form-hint">
+        Imagen: {image.kind === 'cover' ? 'la portada elegida' : image.kind === 'first' ? 'la primera imagen del post' : 'la imagen genérica del blog'}.
+        {auto && ' Descripción: primer párrafo del post (no hay extracto).'}
+      </div>
+    </div>
+  );
+}
+
 // ── Editor ────────────────────────────────────────────────────
 export function Editor({ postId, onBack, registerGuard }) {
   const [savedId, setSavedId] = useState(postId || null);
@@ -258,7 +296,9 @@ export function Editor({ postId, onBack, registerGuard }) {
   const [draftAt, setDraftAt] = useState(null);
   const [slugTouched, setSlugTouched] = useState(!!postId);
   const [mode, setMode] = useState(() => (window.matchMedia('(min-width: 1200px)').matches ? 'split' : 'edit'));
-  const [picker, setPicker] = useState(false);
+  const [picker, setPicker] = useState(false);         // insertar imagen en el texto
+  const [coverPicker, setCoverPicker] = useState(false); // elegir portada
+  const [site, setSite] = useState({ title: 'jrobertoma.com', domain: 'jrobertoma.com' });
   const [help, setHelp] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [uploads, setUploads] = useState(0);
@@ -277,6 +317,9 @@ export function Editor({ postId, onBack, registerGuard }) {
   // ── Carga ──
   useEffect(() => {
     api('/categories').then(r => { if (r.ok) setCats(r.data || []); }).catch(() => {});
+    api('/settings').then(r => {
+      if (r.ok) setSite(s => ({ title: r.data.site_title || s.title, domain: (r.data.site_domain || s.domain).replace(/^https?:\/\/|\/.*$/g, '') }));
+    }).catch(() => {});
     const init = (f) => {
       setForm(f);
       setSavedSnap(snap(f));
@@ -319,7 +362,17 @@ export function Editor({ postId, onBack, registerGuard }) {
   const preview = useMemo(() => {
     const env = {};
     const html = window.renderMarkdown(deferredBody, env);
-    return { html, external: (env.images || []).filter(u => /^https?:\/\//i.test(u)) };
+    const images = env.images || [], alts = env.imageAlts || [];
+    // Primer párrafo sin formato: la descripción automática si no hay extracto
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const firstP = [...doc.querySelectorAll('p')].map(x => x.textContent.replace(/\s+/g, ' ').trim()).find(Boolean) || '';
+    return {
+      html,
+      external: images.filter(u => /^https?:\/\//i.test(u)),
+      firstImage: images.find(u => /^\/?uploads\/media\//.test(u)) || null,
+      missingAlt: alts.filter(badAlt).length,
+      firstP,
+    };
   }, [deferredBody]);
 
   useEffect(() => { window.highlightCode(previewRef.current); }, [preview.html, mode]);
@@ -334,7 +387,7 @@ export function Editor({ postId, onBack, registerGuard }) {
     if (!f.title.trim() || !f.category_id) { setMsg({ type: 'error', text: 'Falta el título o la categoría.' }); return; }
     setSaving(true); setMsg(null);
     const payload = {
-      title: f.title.trim(), body: f.body, excerpt: f.excerpt.trim(), category_id: f.category_id,
+      title: f.title.trim(), body: f.body, excerpt: f.excerpt.trim(), cover_image: f.cover_image || '', category_id: f.category_id,
       status: f.status, date: f.date, tags: f.tags.split(',').map(t => t.trim()).filter(Boolean),
     };
     if (!id && f.id.trim()) payload.id = f.id.trim();
@@ -444,10 +497,17 @@ export function Editor({ postId, onBack, registerGuard }) {
     p.scrollTop = r * (p.scrollHeight - p.clientHeight);
   };
 
-  const excerptFromBody = () => {
-    const doc = new DOMParser().parseFromString(window.renderMarkdown(form.body), 'text/html');
-    const p = [...doc.querySelectorAll('p')].map(x => x.textContent.replace(/\s+/g, ' ').trim()).find(Boolean) || '';
-    if (p) set('excerpt', truncate(p, 220));
+  const excerptFromBody = () => { if (preview.firstP) set('excerpt', truncate(preview.firstP, DESC_MAX)); };
+
+  const uploadCover = async (fileList) => {
+    const file = [...(fileList || [])].find(f => /^image\//.test(f.type));
+    if (!file) return;
+    setUploads(n => n + 1);
+    let res;
+    try { res = await uploadMedia(file); } catch { res = { ok: false, error: 'No se pudo conectar con el servidor' }; }
+    setUploads(n => n - 1);
+    if (res.ok) set('cover_image', res.data.url);
+    else setMsg({ type: 'error', text: `No se pudo subir la portada: ${res.error || 'error desconocido'}` });
   };
 
   // ── Render ──
@@ -561,11 +621,16 @@ export function Editor({ postId, onBack, registerGuard }) {
           <div className="ed-status" aria-live="polite">
             <span>{words.toLocaleString('es-ES')} palabras</span>
             <span>{window.readingTime(form.body)} min de lectura</span>
-            {uploads > 0 && <span>subiendo {uploads} imagen{uploads > 1 ? 'es' : ''}…</span>}
+            {uploads > 0 && <span>subiendo {uploads} {uploads > 1 ? 'imágenes' : 'imagen'}…</span>}
             {draftAt && <span>borrador local {fmtTime(draftAt)}</span>}
+            {preview.missingAlt > 0 && (
+              <span className="warn">
+                ⚠ {preview.missingAlt} {preview.missingAlt > 1 ? 'imágenes' : 'imagen'} sin descripción: escribe qué muestra entre los corchetes de ![…] (ayuda a Google y a los lectores de pantalla).
+              </span>
+            )}
             {preview.external.length > 0 && (
               <span className="warn">
-                ⚠ {preview.external.length} imagen{preview.external.length > 1 ? 'es' : ''} de otro dominio: el sitio no las mostrará (la política de seguridad solo permite imágenes propias). Súbelas a Multimedia.
+                ⚠ {preview.external.length} {preview.external.length > 1 ? 'imágenes' : 'imagen'} de otro dominio: el sitio no las mostrará (la política de seguridad solo permite imágenes propias). Súbelas a Multimedia.
               </span>
             )}
           </div>
@@ -620,14 +685,43 @@ export function Editor({ postId, onBack, registerGuard }) {
             <div className="form-hint">Separados por comas</div>
           </div>
           <div className="form-group">
-            <label className="form-label" htmlFor="ed-excerpt">Extracto</label>
-            <textarea id="ed-excerpt" className="form-input" style={{ minHeight: 90, resize: 'vertical' }} value={form.excerpt} onChange={e => set('excerpt', e.target.value)} placeholder="Breve descripción del post…" />
-            <button type="button" className="btn sm" style={{ marginTop: 6 }} onClick={excerptFromBody} disabled={!form.body.trim()}>Generar desde el contenido</button>
+            <label className="form-label">Portada</label>
+            {form.cover_image ? (
+              <div className="ed-cover"><img src={form.cover_image} alt="Portada del post" /></div>
+            ) : (
+              <div className="ed-cover empty">{preview.firstImage ? 'Se usará la primera imagen del post' : 'Se usará la imagen genérica del blog'}</div>
+            )}
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <button type="button" className="btn sm" onClick={() => setCoverPicker(true)}>{form.cover_image ? 'Cambiar' : 'Elegir de Multimedia'}</button>
+              {form.cover_image && <button type="button" className="btn sm" onClick={() => set('cover_image', '')}>Quitar</button>}
+            </div>
+            <div className="form-hint">Imagen al compartir el post y en Google. Ideal 1200×630.</div>
           </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="ed-excerpt">Extracto · descripción en buscadores</label>
+            <textarea id="ed-excerpt" className="form-input" style={{ minHeight: 90, resize: 'vertical' }} value={form.excerpt} onChange={e => set('excerpt', e.target.value)} placeholder="Qué encontrará el lector, en una o dos frases…" aria-describedby="ed-excerpt-count" />
+            <div className="ed-count" id="ed-excerpt-count">
+              <span className={form.excerpt.length > DESC_MAX + 5 ? 'warn' : ''}>{form.excerpt.length}/{DESC_MAX}</span>
+              {form.excerpt.length > DESC_MAX + 5 && <span className="warn">Google lo cortará</span>}
+              {form.excerpt.length > 0 && form.excerpt.length < 50 && <span className="warn">Muy corto</span>}
+            </div>
+            <button type="button" className="btn sm" style={{ marginTop: 6 }} onClick={excerptFromBody} disabled={!preview.firstP}>Generar desde el contenido</button>
+          </div>
+          <SeoPreview
+            form={form}
+            site={site}
+            slug={savedId || form.id}
+            description={form.excerpt.trim() || truncate(preview.firstP, DESC_MAX)}
+            auto={!form.excerpt.trim() && !!preview.firstP}
+            image={form.cover_image ? { src: form.cover_image, kind: 'cover' }
+              : preview.firstImage ? { src: preview.firstImage, kind: 'first' }
+              : { src: 'assets/og-default.png', kind: 'default' }}
+          />
         </div>
       </div>
 
       {picker && <MediaPicker onPick={pickImage} onUpload={uploadFiles} onClose={() => setPicker(false)} />}
+      {coverPicker && <MediaPicker title="Elegir portada" onPick={m => { set('cover_image', m.url); setCoverPicker(false); }} onUpload={uploadCover} onClose={() => setCoverPicker(false)} />}
     </>
   );
 }

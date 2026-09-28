@@ -15,6 +15,9 @@ npm run watch        # opcional: recompila al guardar mientras desarrollas
 
 1. En el panel de IONOS: **Hosting → Bases de datos → Crear base de datos (MariaDB)**. Anota host (`dbXXXX.hosting-data.io`), nombre, usuario y contraseña.
 2. Abre **phpMyAdmin** e importa `schema.sql`.
+   - **Si la base de datos ya existía**, ejecuta además (pestaña SQL) cada archivo nuevo de
+     `migrations/`, en orden de fecha. Son seguros de repetir. Hoy: `2026-09-28-cover-image.sql`
+     (portada de los posts).
 3. Crea tu usuario administrador. En tu PC:
    ```bash
    php -r 'echo password_hash("una-contraseña-larga-y-única", PASSWORD_DEFAULT), PHP_EOL;'
@@ -37,13 +40,13 @@ Estructura recomendada en el espacio web:
     ├── page.php          (páginas, robots.txt, sitemap.xml y feed.xml)
     ├── admin.html
     ├── api/              (con su .htaccess; incluye api/lib/)
-    ├── assets/           (prose.css, styles.css, mobile.css, app.js, admin.js, hljs.js)
+    ├── assets/           (prose.css, styles.css, mobile.css, app.js, admin.js, hljs.js, og-default.png)
     └── uploads/          (con su .htaccess y uploads/media/)
 ```
 
 En **Dominios y SSL → tu dominio → Destino**, apunta el dominio a `/blog`.
 
-**No subas**: `src/`, `tests/`, `node_modules/`, `docs/`, `schema.sql`, `package*.json`, `build.mjs`, `.git/`.
+**No subas**: `src/`, `tests/`, `migrations/`, `node_modules/`, `docs/`, `schema.sql`, `package*.json`, `build.mjs`, `.git/`.
 (Están bloqueados por `.htaccess` por si acaso, pero es mejor que no estén.)
 
 Copia `.env.example` como `.env`, rellena los datos de IONOS y súbelo a `/`.

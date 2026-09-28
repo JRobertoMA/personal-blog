@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS posts (
   title        VARCHAR(300) NOT NULL,
   body         LONGTEXT NOT NULL,
   excerpt      TEXT,
+  cover_image  VARCHAR(200) NULL,           -- portada (uploads/media/…) para redes y buscadores
   category_id  VARCHAR(50) NOT NULL,
   status       ENUM('published','draft','scheduled') DEFAULT 'draft',
   date         DATE NOT NULL,

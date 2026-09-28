@@ -115,6 +115,19 @@ if ($method === 'GET') {
 requireAuth();
 if (in_array($method, ['POST','PATCH','DELETE'])) verifyCsrf();
 
+// Portada: solo imágenes subidas a Multimedia (misma forma que devuelve /api/media); "" la quita
+function coverImage(PDO $db, mixed $value): ?string {
+    $v = trim((string)($value ?? ''));
+    if ($v !== '' && !hasColumn($db, 'posts', 'cover_image')) {
+        respond(false, 'Falta la columna de portada: ejecuta migrations/2026-09-28-cover-image.sql en phpMyAdmin', 409);
+    }
+    if ($v === '') return null;
+    if (!preg_match('#^uploads/media/[a-f0-9]{16,64}\.(jpg|png|gif|webp)$#', $v)) {
+        respond(false, 'La portada debe ser una imagen de Multimedia', 400);
+    }
+    return $v;
+}
+
 // POST /api/posts
 if ($method === 'POST') {
     $title      = trim($body['title'] ?? '');
@@ -136,9 +149,12 @@ if ($method === 'POST') {
     $exists->execute([$postId]);
     if ($exists->fetchColumn()) respond(false, "Ya existe un post con el slug «{$postId}»", 409);
 
-    $db->prepare(
-        'INSERT INTO posts (id, title, body, excerpt, category_id, status, date) VALUES (?,?,?,?,?,?,?)'
-    )->execute([$postId, $title, $postBody, $excerpt, $categoryId, $status, $date]);
+    $cover = coverImage($db, $body['cover_image'] ?? null);
+    $cols  = ['id', 'title', 'body', 'excerpt', 'category_id', 'status', 'date'];
+    $vals  = [$postId, $title, $postBody, $excerpt, $categoryId, $status, $date];
+    if (hasColumn($db, 'posts', 'cover_image')) { $cols[] = 'cover_image'; $vals[] = $cover; }
+    $db->prepare('INSERT INTO posts (' . implode(', ', $cols) . ') VALUES (' . implode(',', array_fill(0, count($cols), '?')) . ')')
+       ->execute($vals);
 
     syncTags($db, $postId, $tags);
     respond(true, ['id' => $postId], 201);
@@ -158,6 +174,10 @@ if ($method === 'PATCH' && $id) {
         if (trim((string)$cur->fetchColumn()) !== '') {
             respond(false, 'El contenido está vacío y el post guardado no lo está; no se ha sobrescrito', 409);
         }
+    }
+    if (array_key_exists('cover_image', $body)) {
+        $body['cover_image'] = coverImage($db, $body['cover_image']);
+        if (hasColumn($db, 'posts', 'cover_image')) $allowed[] = 'cover_image';
     }
     $sets = []; $params = [];
     foreach ($allowed as $field) {
