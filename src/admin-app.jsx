@@ -575,7 +575,7 @@ function AboutEditor() {
         </div>
         <div className="page-actions">
           {dirty && !saving && <span className="about-dirty">Cambios sin guardar</span>}
-          <a className="btn" href="index.html#/sobre-mi" target="_blank" rel="noopener">Ver en el sitio ↗</a>
+          <a className="btn" href="sobre-mi" target="_blank" rel="noopener">Ver en el sitio ↗</a>
           <button className="btn primary" onClick={save} disabled={saving || !dirty}>{saving ? 'Guardando…' : 'Guardar'}</button>
         </div>
       </div>
@@ -722,7 +722,7 @@ function NotesEditor() {
         </div>
         <div className="page-actions">
           {dirty && !saving && <span className="about-dirty">Cambios sin guardar</span>}
-          <a className="btn" href="index.html" target="_blank" rel="noopener">Ver en el sitio ↗</a>
+          <a className="btn" href="./" target="_blank" rel="noopener">Ver en el sitio ↗</a>
           <button className="btn primary" onClick={save} disabled={saving || !dirty || tooBig}>{saving ? 'Guardando…' : 'Guardar'}</button>
         </div>
       </div>

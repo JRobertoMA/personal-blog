@@ -1,6 +1,7 @@
 # jrobertoma.com — configuración Apache (IONOS hosting compartido)
 Options -Indexes
-DirectoryIndex index.html
+# La portada la sirve page.php (HTML con metadatos para buscadores, ver docs/PLAN-SEO.md)
+DirectoryIndex page.php
 RewriteEngine On
 
 # ─── Carpeta base del proyecto ───────────────────────────────────────────────
@@ -55,10 +56,18 @@ RewriteRule ^(src|node_modules|docs)(/|$) - [F,L]
 # ─── API → router PHP ────────────────────────────────────────────────────────
 RewriteRule ^api(/.*)?$ %{ENV:BASE}/api/index.php [END,QSA]
 
+# ─── SEO: una sola URL por página ────────────────────────────────────────────
+# /index.html → / (301). THE_REQUEST evita el bucle con DirectoryIndex.
+RewriteCond %{THE_REQUEST} \s/+(?:[^?\s]*/)?index\.html[?\s]
+RewriteRule ^index\.html$ %{ENV:BASE}/ [R=301,L]
+# robots.txt, sitemap.xml y feed.xml se generan desde la base de datos
+RewriteRule ^(robots\.txt|sitemap\.xml|feed\.xml)$ %{ENV:BASE}/page.php [END]
+
 # ─── Estáticos existentes se sirven tal cual ─────────────────────────────────
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# ─── Fallback SPA ────────────────────────────────────────────────────────────
-RewriteRule ^ %{ENV:BASE}/index.html [END]
+# ─── Páginas (/post/<slug>, /categoria/<id>, /sobre-mi…) → page.php ──────────
+# Salvo assets/ y uploads/: un recurso que falta ahí da el 404 normal de Apache.
+RewriteRule ^(?!(assets|uploads)/) %{ENV:BASE}/page.php [END]

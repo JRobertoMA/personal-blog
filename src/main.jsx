@@ -12,6 +12,14 @@ import './mobile.jsx';
 
 const { useState, useEffect } = React;
 
+// Enlaces antiguos con hash (/#/post/<slug>) → ruta real (/post/<slug>).
+// Se hace antes de montar nada: el móvil y el escritorio leen la URL al arrancar.
+if (/^#\/./.test(location.hash)) {
+  history.replaceState(null, '', new URL(location.hash.slice(2), document.baseURI).href);
+} else if (location.hash === '#/') {
+  history.replaceState(null, '', location.pathname + location.search);
+}
+
 const TWEAK_DEFAULTS = {
   wallpaper: 'neon',
   soundsOn: true,

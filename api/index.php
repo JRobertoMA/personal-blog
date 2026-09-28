@@ -32,6 +32,9 @@ require __DIR__ . '/middleware/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store');
+// Los JSON de la API no deben salir en buscadores (robots.txt no la bloquea:
+// Google la necesita para renderizar la web)
+header('X-Robots-Tag: noindex');
 
 function respond(bool $ok, $data = null, int $code = 200): void {
     http_response_code($code);
