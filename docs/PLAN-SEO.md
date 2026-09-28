@@ -72,8 +72,20 @@ Estado de partida: rama `claude/practical-pasteur-2ur05z`, commit `4a3fb63` (edi
 
 ## Estado
 
-S1 y S2 implementados en la rama `claude/seo`. S3 queda pendiente; S4 está descrito en
+S1 y S2 implementados (PR #2). S3 implementado en la rama `claude/seo-editor`. S4 está descrito en
 `docs/DESPLIEGUE.md` (sección 7).
+
+S3, tal como quedó:
+- **Portada** (`posts.cover_image`, migración `migrations/2026-09-28-cover-image.sql`): se elige o
+  sube desde el editor; solo se aceptan imágenes de Multimedia. `og:image` usa portada → primera
+  imagen del post → `assets/og-default.png` (1200×630), con `og:image:width/height/alt`.
+  Sin la migración, la web y el guardado siguen funcionando; solo elegir portada avisa de que falta.
+- **Descripción**: el extracto hace de descripción para buscadores (sin columna nueva), con contador
+  de 155 caracteres; «Generar desde el contenido» ya recorta a esa longitud. Sin extracto se usa el
+  primer párrafo.
+- **Vista previa** en la barra lateral del editor: resultado en Google y tarjeta al compartir.
+- **Texto alternativo**: aviso en la barra de estado de las imágenes sin descripción o con una
+  genérica («image», «captura de pantalla…», «IMG_1234»).
 
 Notas de la implementación:
 - `api/lib/Parsedown.php` es la 1.7.4 con un solo cambio (`?array` en dos firmas) para PHP 8.4+.

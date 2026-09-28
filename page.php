@@ -133,6 +133,7 @@ switch ($section) {
             'og_title'    => $site['title'],
             'description' => $site['description'] ?: 'Blog de ' . $about['name'],
             'canonical'   => $url(),
+            'image'       => defaultImage($site),
             'jsonld'      => [[
                 '@context' => 'https://schema.org',
                 '@type'    => 'WebSite',
@@ -152,8 +153,7 @@ switch ($section) {
         $post = $param !== '' ? publishedPost($db, $param) : null;
         if (!$post) { $status = 404; break; }
         $tags  = tagsFor($db, [$post['id']])[$post['id']] ?? [];
-        $img   = firstImage($post['body']);
-        $img   = $img ? absUrl($site['origin'], $img) : null;
+        $img   = postImage($db, $site, $post);
         $desc  = postDescription($post);
         $canon = $url('post/' . rawurlencode($post['id']));
         $mod   = modifiedDate($post);
@@ -187,7 +187,7 @@ switch ($section) {
                     'publisher'     => $author,
                     'mainEntityOfPage' => $canon,
                     'url'           => $canon,
-                    'image'         => $img,
+                    'image'         => $img['url'],
                     'articleSection'=> $post['category_label'],
                     'keywords'      => $tags ? implode(', ', $tags) : null,
                     'inLanguage'    => 'es',
@@ -224,6 +224,7 @@ switch ($section) {
             'og_title'    => $cat['label'],
             'description' => $cat['description'] ?: 'Posts sobre ' . $cat['label'] . ' en ' . $site['title'],
             'canonical'   => $url('categoria/' . rawurlencode($cat['id'])),
+            'image'       => defaultImage($site),
         ];
         $body = '<header><h1>' . h($cat['label']) . '</h1>' . ($cat['description'] ? '<p>' . h($cat['description']) . '</p>' : '') . '</header>'
             . postListHtml($posts);
@@ -244,7 +245,7 @@ switch ($section) {
 
     case 'sobre-mi':
         if ($param !== '') { $status = 404; break; }
-        $img = $about['avatar'] ? absUrl($site['origin'], $about['avatar']) : null;
+        $img = imageMeta($db, $site['origin'], $about['avatar'] ?: null, $about['name']) ?? defaultImage($site);
         $sameAs = array_values(array_filter(array_map(fn($l) => $l['url'] ?? '', $about['links']), fn($u) => str_starts_with($u, 'https://')));
         $meta = [
             'title'       => 'Sobre mí — ' . $site['title'],
@@ -259,7 +260,7 @@ switch ($section) {
                 'url'        => $url('sobre-mi'),
                 'mainEntity' => array_filter($author + [
                     'description' => $about['role'],
-                    'image'       => $img,
+                    'image'       => $about['avatar'] ? $img['url'] : null,
                     'sameAs'      => $sameAs ?: null,
                 ]),
             ]],
