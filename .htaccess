@@ -34,7 +34,9 @@ RewriteRule ^(src|node_modules|docs)(/|$) - [F,L]
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
   Header always set Cross-Origin-Opener-Policy "same-origin"
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+  # Cloudflare Web Analytics (lo inyecta Cloudflare): el script viene de
+  # static.cloudflareinsights.com y envía las métricas a cloudflareinsights.com
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
   # Activa HSTS solo cuando confirmes que HTTPS funciona bien en todo el dominio
   # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 </IfModule>
