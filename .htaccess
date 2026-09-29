@@ -42,10 +42,25 @@ RewriteRule ^(src|node_modules|docs)(/|$) - [F,L]
 </IfModule>
 
 # ─── Caché de estáticos ──────────────────────────────────────────────────────
+# JS y CSS: page.php los enlaza con ?v=<fecha del archivo>, que cambia en cada
+# build → se pueden guardar un año. Sin ?v= (admin.html, enlaces antiguos) el
+# navegador y Cloudflare revalidan siempre, para no servir una versión vieja.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css)$">
+    <If "%{QUERY_STRING} =~ /(^|&)v=[\w-]+/">
+      Header set Cache-Control "public, max-age=31536000, immutable"
+    </If>
+    <Else>
+      Header set Cache-Control "no-cache"
+    </Else>
+  </FilesMatch>
+  # admin.html (las páginas públicas ya las sirve page.php con no-cache)
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
 <IfModule mod_expires.c>
   ExpiresActive On
-  ExpiresByType text/css "access plus 7 days"
-  ExpiresByType application/javascript "access plus 7 days"
   ExpiresByType image/webp "access plus 30 days"
   ExpiresByType image/png "access plus 30 days"
   ExpiresByType image/jpeg "access plus 30 days"

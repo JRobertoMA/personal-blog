@@ -273,12 +273,16 @@ function scrollToAnchor(root, id) {
 
 // Colorea los bloques con data-hl dentro de root; descarga assets/hljs.js la primera vez.
 let hlLoad = null;
+// Misma versión (?v=…) que app.js: page.php la pone en cada build, así hljs.js
+// tampoco se queda en caché tras un despliegue.
+const ASSET_VERSION = (typeof document !== 'undefined' && document.currentScript
+  && (document.currentScript.src.match(/\?v=[\w-]+/) || [''])[0]) || '';
 function loadHighlighter() {
   if (window.jrHighlight) return Promise.resolve(window.jrHighlight);
   if (!hlLoad) {
     hlLoad = new Promise((resolve, reject) => {
       const s = document.createElement('script');
-      s.src = 'assets/hljs.js';
+      s.src = 'assets/hljs.js' + ASSET_VERSION;
       s.async = true;
       s.onload = () => (window.jrHighlight ? resolve(window.jrHighlight) : reject(new Error('hljs')));
       s.onerror = () => { hlLoad = null; s.remove(); reject(new Error('hljs')); };

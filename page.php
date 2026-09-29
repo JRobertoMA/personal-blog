@@ -307,5 +307,11 @@ echo render($meta, pageShell($body, $site, $navCats), $site, $base);
 function render(array $meta, string $content, array $site, string $base): string {
     $tpl = file_get_contents(__DIR__ . '/index.html');
     $tpl = preg_replace('#<!--seo-->.*?<!--/seo-->#s', '<!--seo-->' . "\n" . strtr(renderHead($meta, $site, $base), ['\\' => '\\\\', '$' => '\\$']) . "\n" . '<!--/seo-->', $tpl, 1) ?? $tpl;
+    // ?v=<fecha del archivo> en cada .js/.css: tras subir un build nuevo cambia la URL
+    // y ni el navegador ni Cloudflare sirven la versión anterior (ver .htaccess).
+    $tpl = preg_replace_callback('#(["\'])(assets/[\w.-]+\.(?:css|js))\1#', function ($m) {
+        $mtime = @filemtime(__DIR__ . '/' . $m[2]);
+        return $m[1] . $m[2] . ($mtime ? '?v=' . base_convert((string)$mtime, 10, 36) : '') . $m[1];
+    }, $tpl) ?? $tpl;
     return str_replace('<div id="root"></div>', '<div id="root">' . $content . '</div>', $tpl);
 }

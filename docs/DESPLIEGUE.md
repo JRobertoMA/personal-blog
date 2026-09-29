@@ -57,6 +57,13 @@ Copia `.env.example` como `.env`, rellena los datos de IONOS y súbelo a `/`.
 
 Si algo falla tras subirlo (404 en la API, 500, «Error interno del servidor»), ver [PROBLEMAS-IONOS.md](PROBLEMAS-IONOS.md).
 
+### Caché tras subir un build nuevo
+
+`page.php` enlaza cada `.js` y `.css` con `?v=<fecha del archivo>`, así que al subir un `assets/app.js`
+nuevo cambia la URL y el navegador y Cloudflare descargan la versión nueva; no hace falta purgar nada.
+Si alguna vez ves la versión anterior, comprueba que subiste también `page.php` y el `.htaccess`, y como
+último recurso purga la caché en Cloudflare (*Caching → Configuration → Purge Everything*).
+
 ## 4. PHP y SSL
 
 - **PHP ≥ 8.1** (en *Hosting → PHP*). Se usa `str_starts_with`, arrow functions, etc.
