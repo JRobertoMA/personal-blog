@@ -92,6 +92,20 @@ curl -sI https://jrobertoma.com/ | grep -i content-security-policy   # debe apar
 curl -s -o /dev/null -w "%{http_code}\n" https://jrobertoma.com/.env  # 403
 ```
 
+### 5. Web Analytics
+
+Cloudflare Web Analytics (*Analytics & Logs → Web Analytics*, configuración automática) inserta en cada
+página el script `https://static.cloudflareinsights.com/beacon.min.js` y envía las métricas a
+`https://cloudflareinsights.com/cdn-cgi/rum`. La CSP del `.htaccess` permite exactamente esos dos
+orígenes (`script-src` y `connect-src`); si se quitan, el script se bloquea y no llegan datos.
+
+- No usa cookies ni guarda datos personales del visitante, así que no hace falta banner de cookies por él.
+- Funciona con la navegación del móvil (History API): Cloudflare cuenta cada cambio de ruta como una visita.
+- Es independiente de la analítica propia del blog (visitas por post en el panel); las cifras no coinciden
+  del todo porque cada una cuenta distinto (p. ej. los bloqueadores de rastreo suelen bloquear la de Cloudflare).
+- En navegadores con protección contra rastreo estricta (Firefox, Brave, uBlock…) seguirá viéndose un aviso
+  de CORS o de integridad en la consola: es el bloqueador descartando el script, no un fallo del sitio.
+
 ## Cómo encaja con el código
 
 - **Redirección a HTTPS del [.htaccess](../.htaccess)**: IONOS recibe la petición por HTTP, pero Cloudflare añade
