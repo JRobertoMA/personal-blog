@@ -30,10 +30,17 @@ function BootScreen({ onDone }) {
       '[ 0.788 ] launching desktop session',
       '[ 1.024 ] welcome back, jr.'
     ];
-    log.forEach((l, i) => {
-      setTimeout(() => setLines(prev => [...prev, l]), 200 + i * 320);
-    });
-    setTimeout(onDone, 3900);
+    const timers = log.map((l, i) => setTimeout(() => setLines(prev => [...prev, l]), 200 + i * 320));
+    timers.push(setTimeout(onDone, 3900));
+    // Cualquier tecla o clic la salta
+    const skip = () => onDone();
+    window.addEventListener('keydown', skip);
+    window.addEventListener('pointerdown', skip);
+    return () => {
+      timers.forEach(clearTimeout);
+      window.removeEventListener('keydown', skip);
+      window.removeEventListener('pointerdown', skip);
+    };
   }, []);
 
   return (
@@ -46,6 +53,7 @@ function BootScreen({ onDone }) {
         ))}
         <div className="boot-cursor"></div>
       </div>
+      <div className="boot-skip">pulsa una tecla o haz clic para saltar</div>
     </div>
   );
 }
@@ -66,12 +74,31 @@ function Clock() {
 
 const MAX_POST_WINDOWS = 4;
 
+// La animación de arranque solo se ve en la primera visita (o si se pide
+// "reiniciar"), y nunca con "reducir movimiento" activado en el sistema.
+const BOOT_KEY = 'jr-booted';
+const bootSeen = () => { try { return localStorage.getItem(BOOT_KEY) === '1'; } catch (e) { return false; } };
+const reducedMotion = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const findPost = (id) => (window.BLOG_POSTS || []).find(p => p.id === id);
+
+// Título de la pestaña, como los de page.php
+const siteInfo = () => window.BLOG_SITE || { title: 'jrobertoma.com', description: '' };
+const homeTitle = () => { const s = siteInfo(); return s.title + (s.description ? ' — ' + s.description : ''); };
+const pageTitle = (t) => `${t} — ${siteInfo().title}`;
+
 function Desktop({ tweaks, setTweak }) {
   const wm = window.useWindowManager();
   // Un enlace a un post (/post/<slug>) va directo a él, sin animación de arranque
   const basePath = new URL(document.baseURI).pathname.replace(/[^/]*$/, '');
-  const sharedPostId = (location.pathname.slice(basePath.length).match(/^post\/([^/]+)\/?$/) || [])[1];
-  const [booted,     setBooted]  = useS(!tweaks.showBoot || !!sharedPostId);
+  const initialPath  = location.pathname.slice(basePath.length).replace(/\/+$/, '');
+  const sharedPostId = (initialPath.match(/^post\/([^/]+)$/) || [])[1];
+  const [booted,     setBooted]  = useS(() => !tweaks.showBoot || !!sharedPostId || bootSeen() || reducedMotion());
+  const finishBoot = useCallback(() => {
+    try { localStorage.setItem(BOOT_KEY, '1'); } catch (e) {}
+    setBooted(true);
+  }, []);
+  // Post elegido en el Lector (para la URL cuando el Lector está al frente)
+  const [readerSel, setReaderSel] = useS(null);
   const [menuOpen,   setMenu]    = useS(false);
   const [menuQuery,  setMQ]      = useS('');
   const [ctxMenu,    setCtxMenu] = useS(null);
@@ -135,11 +162,17 @@ function Desktop({ tweaks, setTweak }) {
     });
   }, [wm, click]);
 
-  const openPost = useCallback((postId) => {
+  // push: añade la URL del post al historial (el botón "atrás" lo cierra).
+  // false al abrirlo desde la propia URL (arranque o "atrás"/"adelante").
+  const pushPostUrl = (postId) => {
+    const url = basePath + 'post/' + encodeURIComponent(postId);
+    if (location.pathname !== url) history.pushState(null, '', url);
+  };
+  const openPost = useCallback((postId, { push = true } = {}) => {
     const winId = `post-${postId}`;
     const windows  = windowsRef.current;
     const existing = windows.find(w => w.id === winId);
-    if (existing) { wm.focusWindow(winId); return; }
+    if (existing) { wm.focusWindow(winId); if (push) pushPostUrl(postId); return; }
     const postCount = windows.filter(w => w.id.startsWith('post-')).length;
     if (postCount >= MAX_POST_WINDOWS) return;
     const post = (window.BLOG_POSTS || []).find(p => p.id === postId);
@@ -152,9 +185,11 @@ function Desktop({ tweaks, setTweak }) {
       content: <window.PostApp postId={postId} onOpenComments={act.openComments} onOpenImage={act.openImage} />,
       width: 640, height: 480,
     });
+    if (push) pushPostUrl(postId);
   }, [wm, click, openComments]);
 
-  const openApp = useCallback((appId) => {
+  // opts: x/y (posición) e initial (abierta sola al arrancar)
+  const openApp = useCallback((appId, opts = {}) => {
     const app = APPS.find(a => a.id === appId);
     if (!app) return;
     click();
@@ -163,7 +198,7 @@ function Desktop({ tweaks, setTweak }) {
     let content;
     // Las ventanas guardan su contenido al abrirse: se les pasan las funciones
     // estables de `act`, que siempre llaman a la versión actual.
-    if      (appId === 'reader')   content = <window.ReaderApp onOpenComments={act.openComments} onOpenImage={act.openImage} />;
+    if      (appId === 'reader')   content = <window.ReaderApp onOpenComments={act.openComments} onOpenImage={act.openImage} onSelect={setReaderSel} trackInitial={!opts.initial} />;
     else if (appId === 'files')    content = <window.FilesApp onOpenPost={act.openPost} onOpenApp={act.openApp} />;
     else if (appId === 'notes')    content = <window.NotesApp />;
     else if (appId === 'tags')     content = <window.TagsApp openPost={act.openPost} />;
@@ -175,36 +210,72 @@ function Desktop({ tweaks, setTweak }) {
     else if (appId === 'mail')     content = <window.MailApp />;
     else if (appId === 'about')    content = <window.AboutApp />;
 
-    wm.openWindow({ id: appId, title: app.title, icon: app.icon, content, width: app.w, height: app.h });
+    // Que quepa en pantallas bajas (40 px de barra de tareas)
+    const y = opts.y ?? null;
+    const height = y === null ? app.h : Math.min(app.h, window.innerHeight - 40 - y - 12);
+    wm.openWindow({ id: appId, title: app.title, icon: app.icon, content, width: app.w, height, x: opts.x, y: opts.y });
   }, [wm, click]);
 
   // Funciones estables para el contenido de las ventanas (evita closures congelados)
   const latest = useRef({});
   latest.current = { openPost, openComments, openApp, openImage };
   const act = useMemo(() => ({
-    openPost:     (id)   => latest.current.openPost(id),
+    openPost:     (id)   => latest.current.openPost(id),  // desde ventanas: siempre con historial
     openComments: (id)   => latest.current.openComments(id),
     openApp:      (id)   => latest.current.openApp(id),
     openImage:    (file) => latest.current.openImage(file),
   }), []);
 
-  // Al arrancar: abre el post enlazado o, si no hay, "Acerca de mí"
+  // Al arrancar: el post enlazado; /sobre-mi → "Acerca de mí"; en la portada,
+  // la presentación detrás y el Lector delante, con el último post a la vista.
   useEffect(() => {
     if (!booted) return;
-    const id = sharedPostId && decodeURIComponent(sharedPostId);
-    setTimeout(() => (id ? openPost(id) : openApp('about')), 300);
+    const t = setTimeout(() => {
+      const id = sharedPostId && decodeURIComponent(sharedPostId);
+      if (id) { openPost(id, { push: false }); return; }
+      if (initialPath === 'sobre-mi') { openApp('about'); return; }
+      openApp('about', { x: 200, y: 40, initial: true });
+      openApp('reader', { x: Math.max(240, window.innerWidth - 760 - 32), y: 72, initial: true });
+    }, 300);
+    return () => clearTimeout(t);
   }, [booted]);
 
   const filteredApps = APPS.filter(a => !menuQuery || a.title.toLowerCase().includes(menuQuery.toLowerCase()));
 
   const focusedId = wm.windows.reduce((a, b) => (!a || b.z > a.z) && !b.minimized ? b : a, null)?.id;
 
+  // La URL y el título siguen a la ventana al frente: se puede copiar la
+  // dirección, recargar o compartir y se abre lo mismo (page.php sirve su HTML).
+  useEffect(() => {
+    if (!booted) return;
+    let path = '', title = homeTitle();
+    const postId = !focusedId ? null : focusedId.startsWith('post-') ? focusedId.slice(5) : focusedId === 'reader' ? readerSel : null;
+    const post = postId && findPost(postId);
+    if (post) { path = 'post/' + encodeURIComponent(post.id); title = pageTitle(post.title); }
+    else if (focusedId === 'about') { path = 'sobre-mi'; title = pageTitle('Sobre mí'); }
+    if (location.pathname !== basePath + path) history.replaceState(null, '', basePath + path);
+    document.title = title;
+  }, [booted, focusedId, readerSel]);
+
+  // "Atrás" / "adelante": a la URL de un post → se abre o se trae al frente;
+  // a otra página → se cierra el post que estaba al frente.
+  useEffect(() => {
+    const onPop = () => {
+      const m = location.pathname.slice(basePath.length).match(/^post\/([^/]+)\/?$/);
+      if (m) { latest.current.openPost(decodeURIComponent(m[1]), { push: false }); return; }
+      const top = windowsRef.current.filter(w => w.id.startsWith('post-') && !w.minimized).sort((a, b) => b.z - a.z)[0];
+      if (top) wm.closeWindow(top.id);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   const closeAll = () => { setMenu(false); setCtxMenu(null); };
 
   if (!booted) {
     return (
       <div className="desktop">
-        <BootScreen onDone={() => setBooted(true)} />
+        <BootScreen onDone={finishBoot} />
       </div>
     );
   }

@@ -23,8 +23,9 @@ function useWindowManager() {
         title:     config.title || id,
         icon:      config.icon  || '📄',
         content:   config.content,
-        x:         Math.max(20, (window.innerWidth  - defaultW) / 2 + offset - 100),
-        y:         Math.max(20, (window.innerHeight - defaultH) / 2 + offset - 60),
+        // Posición: la indicada (p. ej. las ventanas del arranque) o centrada en cascada
+        x:         config.x ?? Math.max(20, (window.innerWidth  - defaultW) / 2 + offset - 100),
+        y:         config.y ?? Math.max(20, (window.innerHeight - defaultH) / 2 + offset - 60),
         width:     defaultW,
         height:    defaultH,
         minimized: false,
