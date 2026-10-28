@@ -45,6 +45,13 @@
   .ssr-body pre { overflow-x: auto; padding: 12px; background: #030405; border: 1px solid #2a2f38; border-radius: 6px; }
   html:has(#root > .ssr), html:has(#root > .ssr) body { overflow: auto !important; }
   html:has(#root > .ssr) #root { height: auto !important; }
+  /* Móvil: se lee ya el HTML de page.php en vez de la pantalla de carga; React lo
+     sustituye al arrancar. (En escritorio sí se espera: la interfaz es distinta.) */
+  @media (max-width: 820px), (pointer: coarse) {
+    #app-loading:has(~ #root > .ssr) { display: none; }
+    .ssr { font-size: 17px; padding-top: 16px; }
+    .ssr-nav { display: none; }
+  }
 </style>
 </head>
 <body>

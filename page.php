@@ -13,6 +13,7 @@ ini_set('log_errors', '1');
 
 require __DIR__ . '/api/config/database.php';
 require __DIR__ . '/api/lib/seo.php';
+require __DIR__ . '/api/lib/posts-data.php';
 
 // Carpeta base ("" en el dominio, "/personal-blog" en una copia local)
 $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/page.php')), '/');
@@ -301,10 +302,18 @@ if ($status === 404) {
 http_response_code($status);
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache');
-echo render($meta, pageShell($body, $site, $navCats), $site, $base);
+// Datos que la web pediría a la API al arrancar (los mismos JSON que /api/posts
+// y /api/about): van en la página y la app se monta sin esperar a la red.
+$appData = [
+    'posts'      => listPosts($db, ["p.status = 'published'"]),
+    'categories' => allCategories($db),
+    'about'      => $about,
+    'site'       => ['title' => $site['title'], 'description' => $site['description']],
+];
+echo render($meta, pageShell($body, $site, $navCats), $site, $base, $appData);
 
 // ── Plantilla: index.html con el <head> y el contenido de la página ──
-function render(array $meta, string $content, array $site, string $base): string {
+function render(array $meta, string $content, array $site, string $base, ?array $data = null): string {
     $tpl = file_get_contents(__DIR__ . '/index.html');
     $tpl = preg_replace('#<!--seo-->.*?<!--/seo-->#s', '<!--seo-->' . "\n" . strtr(renderHead($meta, $site, $base), ['\\' => '\\\\', '$' => '\\$']) . "\n" . '<!--/seo-->', $tpl, 1) ?? $tpl;
     // ?v=<fecha del archivo> en cada .js/.css: tras subir un build nuevo cambia la URL
@@ -313,5 +322,10 @@ function render(array $meta, string $content, array $site, string $base): string
         $mtime = @filemtime(__DIR__ . '/' . $m[2]);
         return $m[1] . $m[2] . ($mtime ? '?v=' . base_convert((string)$mtime, 10, 36) : '') . $m[1];
     }, $tpl) ?? $tpl;
-    return str_replace('<div id="root"></div>', '<div id="root">' . $content . '</div>', $tpl);
+    // type="application/json" no se ejecuta (la CSP no lo bloquea); JSON_HEX_TAG evita
+    // que un "</script>" dentro de un texto cierre la etiqueta.
+    $json = $data === null ? '' : "\n" . '<script type="application/json" id="jr-data">'
+        . json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP)
+        . '</script>';
+    return str_replace('<div id="root"></div>', '<div id="root">' . $content . '</div>' . $json, $tpl);
 }

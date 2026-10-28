@@ -333,6 +333,11 @@ html, body { margin: 0; padding: 0; }
 }
 .boot-logo { font-size: 48px; font-weight: 700; letter-spacing: -0.04em; margin-bottom: 8px; text-shadow: 0 0 20px var(--neon); }
 .boot-sub { font-size: 11px; color: var(--text-dim); letter-spacing: 0.3em; text-transform: uppercase; margin-bottom: 50px; }
+.boot-skip {
+  position: absolute; bottom: 28px; left: 0; right: 0; text-align: center;
+  font-size: 11px; letter-spacing: 0.15em; color: var(--text-faint); animation: boot-skip-in 0.4s 0.8s both;
+}
+@keyframes boot-skip-in { from { opacity: 0; } to { opacity: 1; } }
 .boot-log { font-size: 11px; color: var(--text-dim); width: 480px; max-width: 80%; line-height: 1.7; }
 .boot-log .ok { color: var(--neon); }
 .boot-cursor::after { content: '_'; animation: blink 1s steps(1) infinite; color: var(--neon); }

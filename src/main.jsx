@@ -42,10 +42,27 @@ function useIsMobile() {
   return mobile;
 }
 
+// Datos que page.php incrusta en la página (mismo formato que /api/posts y /api/about)
+function embeddedData() {
+  try {
+    const el = document.getElementById('jr-data');
+    const d = el && JSON.parse(el.textContent);
+    return d && Array.isArray(d.posts) ? d : null;
+  } catch (e) { return null; }
+}
+
 function loadData() {
   window.BLOG_POSTS = [];
   window.BLOG_CATEGORIES = [];
   window.BLOG_ABOUT = {};
+  const embedded = embeddedData();
+  if (embedded) {
+    window.BLOG_POSTS      = embedded.posts;
+    window.BLOG_CATEGORIES = embedded.categories || [];
+    window.BLOG_ABOUT      = embedded.about || {};
+    window.BLOG_SITE       = embedded.site || null;
+    return Promise.resolve();
+  }
   const getJson = (url) => fetch(url).then(r => r.json());
   return Promise.all([
     getJson('api/posts').then(res => {

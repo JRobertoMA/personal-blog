@@ -96,12 +96,22 @@ const CAT_COLORS = {
 };
 
 // ── Reader App ─────────────────────────────────────────────────
-function ReaderApp({ onOpenComments, onOpenImage }) {
+// trackInitial=false: abierto solo al arrancar; el primer post no cuenta como
+// visita hasta que el lector elige uno. onSelect avisa al escritorio (URL).
+function ReaderApp({ onOpenComments, onOpenImage, onSelect, trackInitial = true }) {
   const posts = window.BLOG_POSTS || [];
   const [currentId, setCurrentId] = useS(posts[0]?.id || null);
   const { post, loading } = usePost(currentId);
+  const chosen = useRef(trackInitial);
 
-  useEffect(() => { trackView(currentId); }, [currentId]);
+  useEffect(() => { if (chosen.current) trackView(currentId); }, [currentId]);
+
+  const select = (id) => {
+    if (!chosen.current && id === currentId) trackView(id);
+    chosen.current = true;
+    setCurrentId(id);
+    onSelect && onSelect(id);
+  };
 
   return (
     <div className="reader-layout">
@@ -111,7 +121,7 @@ function ReaderApp({ onOpenComments, onOpenImage }) {
           <div
             key={p.id}
             className={`reader-post-item${currentId === p.id ? ' active' : ''}`}
-            onClick={() => setCurrentId(p.id)}
+            onClick={() => select(p.id)}
           >
             {p.title.length > 26 ? p.title.slice(0, 26) + '…' : p.title}
           </div>
