@@ -325,6 +325,21 @@ function PostScreen({ id }) {
                   </button>}
             </section>
 
+            {(() => {
+              const related = window.relatedPosts(post, 3);
+              return related.length > 0 && (
+                <section className="m-related" aria-labelledby="m-related-title">
+                  <h2 id="m-related-title">Sigue leyendo</h2>
+                  {related.map(p => (
+                    <a key={p.id} href={'post/' + encodeURIComponent(p.id)} style={{ '--cat': catColor(p) }}>
+                      <small><span className="m-cat-dot" />{p.category_label || p.category_id}</small>
+                      <span>{p.title}</span>
+                    </a>
+                  ))}
+                </section>
+              );
+            })()}
+
             {(newer || older) && (
               <nav className="m-prevnext" aria-label="Más posts">
                 {older && <a href={'post/' + encodeURIComponent(older.id)}><small>← Anterior</small><span>{older.title}</span></a>}
