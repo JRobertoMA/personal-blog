@@ -123,6 +123,20 @@ function Window({ win, focused, onClose, onFocus, onMinimize, onMaximize, onMove
     document.addEventListener('mouseup', onUp);
   };
 
+  // Al abrirse, el foco entra en la ventana (teclado y lectores de pantalla);
+  // si el foco llega a una ventana de atrás con Tab, se trae al frente.
+  const winRef = useRef(null);
+  const autoFocusing = useRef(false);
+  useEffect(() => {
+    // Solo la que queda delante (al arrancar se abren dos a la vez), y sin que
+    // ese foco automático la traiga al frente
+    if (!focused) return;
+    autoFocusing.current = true;
+    winRef.current?.focus({ preventScroll: true });
+    autoFocusing.current = false;
+  }, []);
+  const titleId = `win-title-${win.id}`;
+
   if (win.minimized) return null;
 
   const style = win.maximized
@@ -134,16 +148,21 @@ function Window({ win, focused, onClose, onFocus, onMinimize, onMaximize, onMove
       className={`window${focused ? ' focused' : ''}${win.maximized ? ' maximized' : ''}`}
       style={style}
       onMouseDown={onFocus}
+      ref={winRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-labelledby={titleId}
+      onFocus={() => { if (!focused && !autoFocusing.current) onFocus(); }}
     >
       <div className="win-titlebar" onMouseDown={onTitleMouseDown} onDoubleClick={onMaximize} ref={titleRef}>
         <div className="win-title">
           <span className="icon">{win.icon}</span>
-          <span className="text">{win.title}</span>
+          <span className="text" id={titleId}>{win.title}</span>
         </div>
         <div className="win-buttons">
-          <button className="win-btn" onClick={(e) => { e.stopPropagation(); playSound?.(); onMinimize(); }} title="Minimizar">─</button>
-          <button className="win-btn" onClick={(e) => { e.stopPropagation(); playSound?.(); onMaximize(); }} title="Maximizar">{win.maximized ? '❐' : '☐'}</button>
-          <button className="win-btn close" onClick={(e) => { e.stopPropagation(); playSound?.(); onClose(); }} title="Cerrar">✕</button>
+          <button className="win-btn" onClick={(e) => { e.stopPropagation(); playSound?.(); onMinimize(); }} title="Minimizar" aria-label="Minimizar">─</button>
+          <button className="win-btn" onClick={(e) => { e.stopPropagation(); playSound?.(); onMaximize(); }} title={win.maximized ? 'Restaurar' : 'Maximizar'} aria-label={win.maximized ? 'Restaurar' : 'Maximizar'}>{win.maximized ? '❐' : '☐'}</button>
+          <button className="win-btn close" onClick={(e) => { e.stopPropagation(); playSound?.(); onClose(); }} title="Cerrar" aria-label="Cerrar">✕</button>
         </div>
       </div>
       <div className="win-body">

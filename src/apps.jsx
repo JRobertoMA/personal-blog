@@ -39,6 +39,63 @@ const inlineImageOpener = (openImage) => openImage && ((src, alt, img) => openIm
   height: img?.naturalHeight || null,
 }));
 
+// ── Más posts al terminar uno ─────────────────────────────────
+// Relacionados: misma categoría (2 puntos) y cada tag en común (1 punto);
+// a igualdad, el más reciente. Sin coincidencias no se rellena con otros.
+function relatedPosts(post, n = 3) {
+  const tags = new Set(post.tags || []);
+  return (window.BLOG_POSTS || [])
+    .filter(p => p.id !== post.id)
+    .map(p => ({ p, score: (p.category_id === post.category_id ? 2 : 0) + (p.tags || []).filter(t => tags.has(t)).length }))
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score || String(b.p.date).localeCompare(String(a.p.date)))
+    .slice(0, n)
+    .map(x => x.p);
+}
+
+// Enlaces reales (se pueden abrir en otra pestaña); el clic normal abre el
+// post dentro del escritorio con onOpen.
+function PostLink({ id, onOpen, className, children }) {
+  const go = (e) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    onOpen(id);
+  };
+  return <a className={className} href={'post/' + encodeURIComponent(id)} onClick={go}>{children}</a>;
+}
+
+function PostMore({ post, onOpen }) {
+  const posts = window.BLOG_POSTS || [];
+  const idx = posts.findIndex(p => p.id === post.id);
+  const older = idx >= 0 ? posts[idx + 1] : null;
+  const newer = idx > 0 ? posts[idx - 1] : null;
+  const related = relatedPosts(post);
+  if (!onOpen || (!older && !newer && !related.length)) return null;
+  return (
+    <nav className="post-more" aria-label="Más posts">
+      {related.length > 0 && (
+        <>
+          <h2 className="post-more-title">// sigue leyendo</h2>
+          <ul className="post-related">
+            {related.map(p => (
+              <li key={p.id}>
+                <PostLink id={p.id} onOpen={onOpen}>{p.title}</PostLink>
+                <span className="cat" style={{ color: p.category_color || CAT_COLORS[p.category_id] }}>{p.category_label || p.category_id}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {(older || newer) && (
+        <div className="post-prevnext">
+          {older && <PostLink id={older.id} onOpen={onOpen} className="prev"><small>← Anterior</small><span>{older.title}</span></PostLink>}
+          {newer && <PostLink id={newer.id} onOpen={onOpen} className="next"><small>Siguiente →</small><span>{newer.title}</span></PostLink>}
+        </div>
+      )}
+    </nav>
+  );
+}
+
 // ── Compartir un post ─────────────────────────────────────────
 // "Copiar enlace" funciona en cualquier navegador; "Compartir…" abre el menú del
 // sistema cuando el navegador lo ofrece (Chrome/Edge en Windows, Safari en macOS).
@@ -103,6 +160,7 @@ function ReaderApp({ onOpenComments, onOpenImage, onSelect, trackInitial = true 
   const [currentId, setCurrentId] = useS(posts[0]?.id || null);
   const { post, loading } = usePost(currentId);
   const chosen = useRef(trackInitial);
+  const readerMainRef = useRef(null);
 
   useEffect(() => { if (chosen.current) trackView(currentId); }, [currentId]);
 
@@ -115,24 +173,24 @@ function ReaderApp({ onOpenComments, onOpenImage, onSelect, trackInitial = true 
 
   return (
     <div className="reader-layout">
-      <div className="reader-sidebar">
+      <nav className="reader-sidebar" aria-label="Posts">
         <div className="reader-sidebar-head">~/posts</div>
         {posts.map(p => (
           <div
             key={p.id}
             className={`reader-post-item${currentId === p.id ? ' active' : ''}`}
-            onClick={() => select(p.id)}
+            {...window.pressable(() => select(p.id), { label: p.title, current: currentId === p.id })}
           >
             {p.title.length > 26 ? p.title.slice(0, 26) + '…' : p.title}
           </div>
         ))}
-      </div>
-      <div className="app" style={{ flex: 1 }}>
+      </nav>
+      <div className="app" style={{ flex: 1 }} ref={readerMainRef}>
         {post ? (
           <>
             <h1>{post.title}</h1>
             <div className="meta">
-              {post.date} · {(post.tags || []).map(t => <span key={t} className="tag-pill">#{t}</span>)}
+              {post.date}{post.body && <> · {window.readingTime(post.body)} min de lectura</>} · {(post.tags || []).map(t => <span key={t} className="tag-pill">#{t}</span>)}
             </div>
             {loading && !post.body
               ? <div style={{ color: 'var(--text-faint)', fontSize: 13 }}>cargando…</div>
@@ -149,6 +207,7 @@ function ReaderApp({ onOpenComments, onOpenImage, onSelect, trackInitial = true 
               )}
               <ShareButtons post={post} />
             </div>
+            <PostMore post={post} onOpen={(id) => { select(id); readerMainRef.current?.scrollTo(0, 0); }} />
           </>
         ) : (
           <div style={{ color: 'var(--text-faint)', fontSize: 13 }}>Selecciona un post</div>
@@ -282,7 +341,7 @@ function FilesApp({ onOpenPost, onOpenApp }) {
   }
 
   const item = (id, icon, label, color) => (
-    <div className={`item${loc === id ? ' active' : ''}`} onClick={() => go(id)}>
+    <div className={`item${loc === id ? ' active' : ''}`} {...window.pressable(() => go(id), { current: loc === id })}>
       <span style={color ? { color } : undefined}>{icon}</span>{label}
     </div>
   );
@@ -315,7 +374,7 @@ function FilesApp({ onOpenPost, onOpenApp }) {
           </div>
           {filtered.length === 0 && <div className="fx-empty">// carpeta vacía</div>}
           {filtered.map(p => (
-            <div key={p.id} className="fx-row" onClick={() => onOpenPost && onOpenPost(p.id)} title="Abrir post">
+            <div key={p.id} className="fx-row" {...window.pressable(() => onOpenPost && onOpenPost(p.id))} title="Abrir post">
               <span>📄</span>
               <span className="name">{p.title}.md</span>
               <span>{p.category_label || p.category_id}</span>
@@ -333,7 +392,7 @@ function FilesApp({ onOpenPost, onOpenApp }) {
 }
 
 // ── Post App (ventana individual de post) ──────────────────────
-function PostApp({ postId, onOpenComments, onOpenImage }) {
+function PostApp({ postId, onOpenComments, onOpenImage, onOpenPost }) {
   const { post, loading, error } = usePost(postId);
 
   useEffect(() => { trackView(postId); }, [postId]);
@@ -345,7 +404,7 @@ function PostApp({ postId, onOpenComments, onOpenImage }) {
     <div className="app">
       <h1>{post.title}</h1>
       <div className="meta">
-        {post.date} · {(post.tags || []).map(t => <span key={t} className="tag-pill">#{t}</span>)}
+        {post.date}{post.body && <> · {window.readingTime(post.body)} min de lectura</>} · {(post.tags || []).map(t => <span key={t} className="tag-pill">#{t}</span>)}
       </div>
       {loading && !post.body
         ? <div style={{ color: 'var(--text-faint)', fontSize: 13 }}>cargando…</div>
@@ -358,6 +417,7 @@ function PostApp({ postId, onOpenComments, onOpenImage }) {
         </button>
         <ShareButtons post={post} />
       </div>
+      <PostMore post={post} onOpen={onOpenPost} />
     </div>
   );
 }
@@ -429,7 +489,7 @@ function TagsApp({ openPost }) {
             <button onClick={() => setSel(null)} aria-label="Cerrar lista">✕</button>
           </div>
           {matches.map(p => (
-            <div key={p.id} className="search-result" onClick={() => openPost && openPost(p.id)}>
+            <div key={p.id} className="search-result" {...window.pressable(() => openPost && openPost(p.id))}>
               <div className="title">{p.title}</div>
               <div className="meta">{p.date} · {p.category_label || p.category_id}</div>
             </div>
@@ -442,8 +502,7 @@ function TagsApp({ openPost }) {
         const n = posts.filter(p => p.category_id === c.id).length;
         return (
           <div key={c.id} className={`cat-card${isSel('cat', c.id) ? ' active' : ''}`} style={{ borderLeftColor: c.color || 'var(--neon)' }}
-            onClick={() => toggle({ type: 'cat', value: c.id, label: c.label })} role="button" tabIndex={0}
-            onKeyDown={e => { if (e.key === 'Enter') toggle({ type: 'cat', value: c.id, label: c.label }); }}>
+            {...window.pressable(() => toggle({ type: 'cat', value: c.id, label: c.label }), { pressed: isSel('cat', c.id) })}>
             <div className="name">{c.label} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>· {n} post{n !== 1 ? 's' : ''}</span></div>
             {c.description && <div className="desc">{c.description}</div>}
           </div>
@@ -485,7 +544,7 @@ function SearchApp({ openPost }) {
           </div>
         )}
         {results.map(p => (
-          <div key={p.id} className="search-result" onClick={() => openPost && openPost(p.id)}>
+          <div key={p.id} className="search-result" {...window.pressable(() => openPost && openPost(p.id))}>
             <div className="title">{p.title}</div>
             <div className="preview">{p.excerpt}</div>
             <div className="meta">{p.date} · {p.category_label || p.category_id} · {(p.tags||[]).map(t=>'#'+t).join(' ')}</div>
@@ -551,7 +610,7 @@ function CalendarApp({ openPost }) {
             : <div key={i} className={cls}>{d}</div>;
         })}
       </div>
-      <div style={{ marginTop: 18, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-faint)', display: 'flex', gap: 16 }}>
+      <div style={{ marginTop: 18, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-faint)', display: 'flex', gap: 16 }}>
         <span><span style={{ color: 'var(--neon)' }}>■</span> hoy</span>
         <span><span style={{ color: 'var(--accent-pink)' }}>●</span> post publicado (pulsa el día)</span>
       </div>
@@ -562,7 +621,7 @@ function CalendarApp({ openPost }) {
         </div>
         {listed.length === 0 && <div className="cal-posts-empty">// sin posts este mes</div>}
         {listed.map(p => (
-          <div key={p.id} className="search-result" onClick={() => openPost && openPost(p.id)}>
+          <div key={p.id} className="search-result" {...window.pressable(() => openPost && openPost(p.id))}>
             <div className="title">{p.title}</div>
             <div className="meta">{p.date} · {p.category_label || p.category_id}</div>
           </div>
@@ -962,6 +1021,7 @@ function AboutApp() {
 window.usePost     = usePost;
 window.trackView   = trackView;
 window.ReaderApp   = ReaderApp;
+window.relatedPosts = relatedPosts;
 window.CommentsApp = CommentsApp;
 window.FilesApp    = FilesApp;
 window.PostApp     = PostApp;

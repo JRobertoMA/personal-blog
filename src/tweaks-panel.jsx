@@ -63,8 +63,7 @@ function TweakToggle({ label, value, onChange }) {
       <span>{label}</span>
       <div
         className={`tweak-toggle-switch${value ? ' on' : ''}`}
-        onClick={() => onChange(!value)}
-        role="switch"
+        {...window.pressable(() => onChange(!value), { role: 'switch', label })}
         aria-checked={value}
       />
     </div>

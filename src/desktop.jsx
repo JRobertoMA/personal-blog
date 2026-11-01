@@ -1,6 +1,7 @@
 // ─── Desktop Component ─────────────────────────────────────────
 (function() {
 const { useState: useS, useEffect, useRef, useCallback, useMemo } = React;
+const pressable = (...a) => window.pressable(...a);
 
 const APPS = [
   { id: 'about',    title: 'Acerca de mí',     icon: '👤', w: 520, h: 580, desktop: true  },
@@ -173,8 +174,11 @@ function Desktop({ tweaks, setTweak }) {
     const windows  = windowsRef.current;
     const existing = windows.find(w => w.id === winId);
     if (existing) { wm.focusWindow(winId); if (push) pushPostUrl(postId); return; }
-    const postCount = windows.filter(w => w.id.startsWith('post-')).length;
-    if (postCount >= MAX_POST_WINDOWS) return;
+    // Con el máximo abierto se cierra el post más antiguo (el de más atrás)
+    const postWins = windows.filter(w => w.id.startsWith('post-'));
+    if (postWins.length >= MAX_POST_WINDOWS) {
+      wm.closeWindow(postWins.reduce((a, b) => (b.z < a.z ? b : a)).id);
+    }
     const post = (window.BLOG_POSTS || []).find(p => p.id === postId);
     if (!post) return;
     click();
@@ -182,7 +186,7 @@ function Desktop({ tweaks, setTweak }) {
       id: winId,
       title: post.title,
       icon: '📄',
-      content: <window.PostApp postId={postId} onOpenComments={act.openComments} onOpenImage={act.openImage} />,
+      content: <window.PostApp postId={postId} onOpenComments={act.openComments} onOpenImage={act.openImage} onOpenPost={act.openPost} />,
       width: 640, height: 480,
     });
     if (push) pushPostUrl(postId);
@@ -272,6 +276,20 @@ function Desktop({ tweaks, setTweak }) {
 
   const closeAll = () => { setMenu(false); setCtxMenu(null); };
 
+  // Esc cierra el menú de inicio o el contextual y devuelve el foco al botón
+  const menuBtnRef = useRef(null);
+  useEffect(() => {
+    if (!menuOpen && !ctxMenu) return;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const wasMenu = menuOpen;
+      closeAll();
+      if (wasMenu) menuBtnRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen, ctxMenu]);
+
   if (!booted) {
     return (
       <div className="desktop">
@@ -293,15 +311,17 @@ function Desktop({ tweaks, setTweak }) {
         {tweaks.wallpaper === 'matrix' && <window.MatrixRain />}
       </div>
 
+      <h1 className="sr-only">{siteInfo().title}</h1>
+
       {/* Desktop icons */}
-      <div className="desk-icons">
+      <nav className="desk-icons" aria-label="Aplicaciones">
         {APPS.filter(a => a.desktop).map(app => (
-          <div key={app.id} className="desk-icon" onClick={() => openApp(app.id)} onDoubleClick={() => openApp(app.id)}>
+          <div key={app.id} className="desk-icon" {...pressable(() => openApp(app.id), { label: `Abrir ${app.title}` })} onDoubleClick={() => openApp(app.id)}>
             <div className="ico">{app.icon}</div>
-            <div className="lbl">{app.title}</div>
+            <div className="lbl" aria-hidden="true">{app.title}</div>
           </div>
         ))}
-      </div>
+      </nav>
 
       {/* Windows */}
       {wm.windows.map(win => (
@@ -321,7 +341,7 @@ function Desktop({ tweaks, setTweak }) {
 
       {/* Start menu */}
       {menuOpen && (
-        <div className="start-menu" onClick={e => e.stopPropagation()}>
+        <div className="start-menu" role="dialog" aria-label="Menú de inicio" onClick={e => e.stopPropagation()}>
           <div className="sm-header">
             <div className="sm-avatar">{window.aboutInitials()}</div>
             <div className="sm-user">
@@ -331,21 +351,21 @@ function Desktop({ tweaks, setTweak }) {
           </div>
           <div className="sm-search">
             <span style={{ color: 'var(--neon)' }}>⌕</span>
-            <input autoFocus placeholder="buscar app o comando…"
+            <input autoFocus aria-label="Buscar aplicación" placeholder="buscar app o comando…"
               value={menuQuery} onChange={e => setMQ(e.target.value)} />
           </div>
           <div className="sm-grid">
             {filteredApps.map(a => (
-              <div key={a.id} className="sm-item" onClick={() => openApp(a.id)}>
+              <div key={a.id} className="sm-item" {...pressable(() => openApp(a.id))}>
                 <div className="ico">{a.icon}</div>
                 <div className="lbl">{a.title}</div>
               </div>
             ))}
           </div>
           <div className="sm-footer">
-            <span onClick={() => openApp('about')}>perfil</span>
-            <span onClick={() => openApp('terminal')}>terminal</span>
-            <span style={{ marginLeft: 'auto' }} onClick={() => { setBooted(false); setTimeout(() => setBooted(true), 50); }}>↻ reiniciar</span>
+            <span {...pressable(() => openApp('about'))}>perfil</span>
+            <span {...pressable(() => openApp('terminal'))}>terminal</span>
+            <span style={{ marginLeft: 'auto' }} {...pressable(() => { setBooted(false); setTimeout(() => setBooted(true), 50); }, { label: 'Reiniciar el escritorio' })}>↻ reiniciar</span>
           </div>
         </div>
       )}
@@ -356,19 +376,21 @@ function Desktop({ tweaks, setTweak }) {
           className="ctx-menu"
           style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y - 72, zIndex: 99999 }}
           onClick={e => e.stopPropagation()}
+          role="menu"
         >
-          <div className="ctx-menu-item" onClick={() => { wm.centerWindow(ctxMenu.winId); setCtxMenu(null); }}>
+          <div className="ctx-menu-item" {...pressable(() => { wm.centerWindow(ctxMenu.winId); setCtxMenu(null); }, { role: 'menuitem' })}>
             Restaurar al centro
           </div>
-          <div className="ctx-menu-item danger" onClick={() => { wm.closeWindow(ctxMenu.winId); setCtxMenu(null); }}>
+          <div className="ctx-menu-item danger" {...pressable(() => { wm.closeWindow(ctxMenu.winId); setCtxMenu(null); }, { role: 'menuitem' })}>
             Cerrar
           </div>
         </div>
       )}
 
       {/* Taskbar */}
-      <div className="taskbar" onClick={e => { e.stopPropagation(); setCtxMenu(null); }}>
-        <div className="tb-menu" onClick={e => { e.stopPropagation(); setCtxMenu(null); setMenu(o => !o); }}>
+      <nav className="taskbar" aria-label="Barra de tareas" onClick={e => { e.stopPropagation(); setCtxMenu(null); }}>
+        <div className="tb-menu" ref={menuBtnRef} aria-expanded={menuOpen} aria-haspopup="dialog"
+          {...pressable(e => { e.stopPropagation(); setCtxMenu(null); setMenu(o => !o); }, { label: 'Menú de inicio' })}>
           <span className="dot"></span>
           <span>jr-os</span>
         </div>
@@ -377,11 +399,11 @@ function Desktop({ tweaks, setTweak }) {
             <div
               key={win.id}
               className={`tb-window${win.id === focusedId ? ' active' : ''}${win.minimized ? ' minimized' : ''}`}
-              onClick={() => {
+              {...pressable(() => {
                 if (win.minimized) wm.focusWindow(win.id);
                 else if (win.id === focusedId) wm.toggleMinimize(win.id);
                 else wm.focusWindow(win.id);
-              }}
+              }, { label: `${win.title}${win.minimized ? ' (minimizada)' : ''}`, pressed: win.id === focusedId })}
               onContextMenu={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -395,12 +417,13 @@ function Desktop({ tweaks, setTweak }) {
         </div>
         <div className="tb-systray">
           <span className="sysicon" title="wifi">⌬</span>
-          <span className="sysicon" title={soundOn ? 'Silenciar' : 'Activar sonido'} onClick={e => { e.stopPropagation(); setTweak('soundsOn', !soundOn); }}>
+          <span className="sysicon" title={soundOn ? 'Silenciar' : 'Activar sonido'}
+            {...pressable(e => { e.stopPropagation(); setTweak('soundsOn', !soundOn); }, { label: soundOn ? 'Silenciar' : 'Activar sonido' })}>
             {soundOn ? '🔊' : '🔇'}
           </span>
           <Clock />
         </div>
-      </div>
+      </nav>
     </div>
   );
 }
@@ -433,9 +456,16 @@ function MatrixRain() {
         if (y * 14 > canvas.height && Math.random() > 0.975) drops[i] = 0;
         drops[i]++;
       });
-      raf = requestAnimationFrame(draw);
+      if (!still) raf = requestAnimationFrame(draw);
     };
-    draw();
+    // Con "reducir movimiento": se pinta una lluvia ya formada y se detiene
+    const still = reducedMotion();
+    if (still) {
+      drops.forEach((_, i) => { drops[i] = Math.floor(Math.random() * canvas.height / 14); });
+      for (let n = 0; n < 120; n++) draw();
+    } else {
+      draw();
+    }
     return () => cancelAnimationFrame(raf);
   }, []);
   return <canvas ref={canvasRef} className="matrix-canvas" style={{ width: '100%', height: '100%' }} />;

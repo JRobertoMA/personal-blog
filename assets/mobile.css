@@ -248,6 +248,14 @@ a.m-tag:active, .m-tag.big:active { border-color: var(--neon); color: var(--neon
 }
 
 /* Anterior / siguiente */
+.m-related { margin-top: 26px; }
+.m-related h2 { font-family: var(--font-mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--m-faint); margin: 0 0 10px; }
+.m-related a {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; margin-bottom: 8px; min-height: 44px;
+  border-radius: 12px; background: var(--m-surface); border: 1px solid var(--m-line); color: var(--m-text) !important;
+}
+.m-related small { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11.5px; color: var(--cat); }
+.m-related span { font-size: 15px; font-weight: 600; line-height: 1.3; }
 .m-prevnext { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }
 .m-prevnext a {
   display: flex; flex-direction: column; gap: 4px; padding: 14px; min-height: 44px;
